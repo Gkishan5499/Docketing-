@@ -1,0 +1,6 @@
+{
+  "name": "Lawyers Diary",
+  "description": "Legal Practice Management System for Advocates managing cases across Supreme Court, High Courts, District Courts, Tribunals, and IPR (Trademark, Patent, Copyright, Design, GI).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

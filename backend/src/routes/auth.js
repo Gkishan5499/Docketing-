@@ -1,0 +1,12 @@
+const express = require('express');
+const { auth } = require('../middleware/auth');
+const { ok } = require('../utils');
+const controller = require('../controllers/auth.controller');
+const router = express.Router();
+router.post('/register', controller.register);
+router.post('/login', controller.login);
+router.post('/refresh', controller.refresh);
+router.post('/logout', controller.logout);
+router.get('/me', auth, (req, res) => ok(res, req.user, 'Current user fetched successfully'));
+router.post('/change-password', auth, controller.changePassword);
+module.exports = router;
