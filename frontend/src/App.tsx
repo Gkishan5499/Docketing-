@@ -20,6 +20,8 @@ import { OwnerLoginPage } from './pages/OwnerLoginPage';
 import { OwnerDashboardPage } from './pages/OwnerDashboardPage';
 import { OwnerManagementPage } from './pages/OwnerManagementPage';
 import { AddMatterPage } from './pages/AddMatterPage';
+import { EditProfilePage } from './pages/EditProfilePage';
+import { AccountSettingsPage } from './pages/AccountSettingsPage';
 
 function ApplicationRoutes() {
   const location = useLocation();
@@ -69,6 +71,8 @@ function ApplicationRoutes() {
         <Route path="not" element={<NotesPage />} />
         <Route path="notif" element={<NotificationsPage />} />
         <Route path="team" element={<TeamPage />} />
+        <Route path="edit-profile" element={<EditProfilePage />} />
+        <Route path="account-settings" element={<AccountSettingsPage />} />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/db" replace />} />

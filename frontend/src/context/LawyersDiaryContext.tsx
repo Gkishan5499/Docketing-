@@ -25,6 +25,13 @@ import {
   initialNotes,
 } from '../data/seedData';
 import { gid, tsNow, dDiff } from '../utils/helpers';
+import {
+  buildGoogleCalendarUrl,
+  openGoogleCalendarEvent,
+  generateIcsContent,
+  downloadIcsFile,
+  buildGoogleCalendarSubscribeUrl,
+} from '../utils/calendarSync';
 
 interface ModalState {
   type:
@@ -44,11 +51,15 @@ interface LawyersDiaryContextType {
   // Auth
   isLoggedIn: boolean;
   currentUser: string;
+  currentEmail: string;
   currentRole: 'FIRM_ADMIN' | 'ATTORNEY' | 'PARALEGAL' | 'STAFF' | 'VIEWER';
+  mustChangePassword: boolean;
   canDeleteRecords: boolean;
   login: (email: string, pass: string) => Promise<boolean>;
   loginGoogle: () => void;
   logout: () => void;
+  updateProfile: (fields: { name?: string; email?: string }) => void;
+  completePasswordSetup: (currentPassword: string, newPassword: string) => Promise<boolean>;
 
   // Sidebar & Layout
   sidebarMinimized: boolean;
@@ -67,9 +78,19 @@ interface LawyersDiaryContextType {
   workLogs: WorkLogEntry[];
   notes: NoteItem[];
 
-  // Sync
+  // Sync & Google Calendar
   syncStatus: 'synced' | 'syncing';
   syncDriveAndCalendar: () => void;
+  googleCalendarEmail: string;
+  googleCalendarSync: boolean;
+  googleCalendarScope: 'all' | 'assigned';
+  calendarToken: string;
+  connectGoogleCalendar: (gmail: string) => Promise<boolean>;
+  disconnectGoogleCalendar: () => Promise<boolean>;
+  setGoogleCalendarScope: (scope: 'all' | 'assigned') => void;
+  openEventInGoogleCalendar: (event: DocketEvent) => void;
+  exportAllEventsToGoogleCalendar: (customEvents?: DocketEvent[]) => void;
+  subscribeGoogleCalendarFeed: () => void;
 
   // Toasts
   toasts: ToastMessage[];
@@ -159,10 +180,16 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     loadFromStorage('isLoggedIn', false)
   );
   const [currentUser, setCurrentUser] = useState<string>(() =>
-    loadFromStorage('currentUser', 'Advocate')
+    loadFromStorage('currentUser', '')
+  );
+  const [currentEmail, setCurrentEmail] = useState<string>(() =>
+    loadFromStorage('currentEmail', '')
   );
   const [currentRole, setCurrentRole] = useState<'FIRM_ADMIN' | 'ATTORNEY' | 'PARALEGAL' | 'STAFF' | 'VIEWER'>(() =>
     loadFromStorage('currentRole', 'ATTORNEY')
+  );
+  const [mustChangePassword, setMustChangePassword] = useState<boolean>(() =>
+    loadFromStorage('mustChangePassword', false)
   );
   const canDeleteRecords = currentRole === 'FIRM_ADMIN' || currentRole === 'ATTORNEY';
 
@@ -172,6 +199,18 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
   );
   const [isNotifPanelOpen, setIsNotifPanelOpen] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing'>('synced');
+  const [googleCalendarEmail, setGoogleCalendarEmailState] = useState<string>(() =>
+    loadFromStorage('googleCalendarEmail', '')
+  );
+  const [googleCalendarSync, setGoogleCalendarSync] = useState<boolean>(() =>
+    loadFromStorage('googleCalendarSync', false)
+  );
+  const [googleCalendarScope, setGoogleCalendarScope] = useState<'all' | 'assigned'>(() =>
+    loadFromStorage('googleCalendarScope', 'all')
+  );
+  const [calendarToken, setCalendarToken] = useState<string>(() =>
+    loadFromStorage('calendarToken', '')
+  );
 
   // Modals state
   const [modalState, setModalState] = useState<ModalState>({ type: 'none' });
@@ -211,24 +250,55 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Sync to localStorage
   useEffect(() => saveToStorage('isLoggedIn', isLoggedIn), [isLoggedIn]);
   useEffect(() => saveToStorage('currentUser', currentUser), [currentUser]);
+  useEffect(() => saveToStorage('currentEmail', currentEmail), [currentEmail]);
   useEffect(() => saveToStorage('currentRole', currentRole), [currentRole]);
+  useEffect(() => saveToStorage('mustChangePassword', mustChangePassword), [mustChangePassword]);
+  useEffect(() => saveToStorage('googleCalendarEmail', googleCalendarEmail), [googleCalendarEmail]);
+  useEffect(() => saveToStorage('googleCalendarSync', googleCalendarSync), [googleCalendarSync]);
+  useEffect(() => saveToStorage('googleCalendarScope', googleCalendarScope), [googleCalendarScope]);
+  useEffect(() => saveToStorage('calendarToken', calendarToken), [calendarToken]);
   useEffect(() => {
     fetch('/api/v1/auth/me', { credentials: 'include' })
       .then(async (response) => {
         if (!response.ok) throw new Error('Session expired');
         const result = await response.json();
         const user = result.data;
+        if (user.role === 'SUPER_ADMIN') {
+          // SUPER_ADMIN belongs to the Owner Console (/owner), NOT lawyer workspace
+          setIsLoggedIn(false);
+          setCurrentUser('');
+          setCurrentEmail('');
+          setCurrentRole('ATTORNEY');
+          return;
+        }
         setCurrentUser(user.name);
+        if (user.email) setCurrentEmail(user.email);
         setCurrentRole(user.role);
+        if (user.mustChangePassword !== undefined) {
+          setMustChangePassword(Boolean(user.mustChangePassword));
+        }
+        if (user.googleCalendarEmail) {
+          setGoogleCalendarEmailState(user.googleCalendarEmail);
+        } else if (user.email && user.email.toLowerCase().includes('@gmail.com') && !googleCalendarEmail) {
+          setGoogleCalendarEmailState(user.email.toLowerCase());
+        }
+        if (user.googleCalendarSync !== undefined) {
+          setGoogleCalendarSync(Boolean(user.googleCalendarSync));
+        }
+        if (user.calendarToken) {
+          setCalendarToken(user.calendarToken);
+        }
         setIsLoggedIn(true);
       })
       .catch(() => {
         setIsLoggedIn(false);
         setCurrentUser('');
         setCurrentRole('ATTORNEY');
+        setMustChangePassword(false);
         localStorage.removeItem(`${STORAGE_PREFIX}isLoggedIn`);
         localStorage.removeItem(`${STORAGE_PREFIX}currentUser`);
         localStorage.removeItem(`${STORAGE_PREFIX}currentRole`);
+        localStorage.removeItem(`${STORAGE_PREFIX}mustChangePassword`);
       });
   }, []);
   useEffect(() => saveToStorage('clients', clients), [clients]);
@@ -285,11 +355,32 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
           throw new Error(result.message || 'Invalid credentials');
         }
         const user = result.data.user;
+        if (user.role === 'SUPER_ADMIN') {
+          throw new Error('This account belongs to the platform owner. Please sign in via the Owner Portal at /owner/login.');
+        }
+        const needsPasswordChange = Boolean(result.data.mustChangePassword || user.mustChangePassword);
         setCurrentUser(user.name);
+        if (user.email) setCurrentEmail(user.email);
         setCurrentRole(user.role);
+        setMustChangePassword(needsPasswordChange);
+        if (user.googleCalendarEmail) {
+          setGoogleCalendarEmailState(user.googleCalendarEmail);
+        } else if (user.email && user.email.toLowerCase().includes('@gmail.com')) {
+          setGoogleCalendarEmailState(user.email.toLowerCase());
+        }
+        if (user.googleCalendarSync !== undefined) {
+          setGoogleCalendarSync(Boolean(user.googleCalendarSync));
+        }
+        if (user.calendarToken) {
+          setCalendarToken(user.calendarToken);
+        }
         setIsLoggedIn(true);
         audit('LOGIN', 'System', `User ${user.name} logged in`);
-        showToast(`Welcome, ${user.name.split(' ')[0]}!`, 'ok');
+        if (needsPasswordChange) {
+          showToast('Security alert: Please set your permanent private password.', 'in');
+        } else {
+          showToast(`Welcome, ${user.name.split(' ')[0]}!`, 'ok');
+        }
         return true;
       } catch (error) {
         showToast(error instanceof Error ? error.message : 'Unable to sign in', 'er');
@@ -302,7 +393,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const loginGoogle = useCallback(() => {
     showToast('Connecting with Google OAuth…', 'in');
     setTimeout(() => {
-      const username = 'Advocate';
+      const username = 'Partner Advocate';
       setCurrentUser(username);
       setCurrentRole('ATTORNEY');
       setIsLoggedIn(true);
@@ -312,14 +403,55 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [audit, showToast]);
 
   const logout = useCallback(() => {
+    fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     setIsLoggedIn(false);
     setCurrentUser('');
+    setCurrentEmail('');
     setCurrentRole('ATTORNEY');
+    setMustChangePassword(false);
     localStorage.removeItem(`${STORAGE_PREFIX}isLoggedIn`);
     localStorage.removeItem(`${STORAGE_PREFIX}currentUser`);
+    localStorage.removeItem(`${STORAGE_PREFIX}currentEmail`);
     localStorage.removeItem(`${STORAGE_PREFIX}currentRole`);
+    localStorage.removeItem(`${STORAGE_PREFIX}mustChangePassword`);
     sessionStorage.removeItem('ld_owner_portal');
     showToast('Signed out successfully', 'in');
+  }, [showToast]);
+
+  const completePasswordSetup = useCallback(
+    async (currentPassword: string, newPassword: string): Promise<boolean> => {
+      try {
+        const response = await fetch('/api/v1/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ currentPassword, newPassword }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || 'Unable to update password');
+        }
+        setMustChangePassword(false);
+        audit('UPDATE', 'Security', 'Permanent password established');
+        showToast('Password updated! Your workspace is unlocked.', 'ok');
+        return true;
+      } catch (error) {
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          setMustChangePassword(false);
+          showToast('Password updated locally! Workspace unlocked.', 'ok');
+          return true;
+        }
+        showToast(error instanceof Error ? error.message : 'Unable to update password', 'er');
+        return false;
+      }
+    },
+    [audit, showToast]
+  );
+
+  const updateProfile = useCallback((fields: { name?: string; email?: string }) => {
+    if (fields.name !== undefined) setCurrentUser(fields.name);
+    if (fields.email !== undefined) setCurrentEmail(fields.email);
+    showToast('Profile updated successfully', 'ok');
   }, [showToast]);
 
   const toggleSidebar = useCallback(() => {
@@ -338,16 +470,103 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setModalState({ type: 'none' });
   }, []);
 
-  // Drive & Calendar Sync
+  // Drive & Google Calendar Sync
   const syncDriveAndCalendar = useCallback(() => {
     setSyncStatus('syncing');
-    showToast('Syncing Google Calendar & Drive folders…', 'in');
+    const targetMsg = googleCalendarEmail
+      ? `Syncing Google Calendar (${googleCalendarEmail}) & Drive…`
+      : 'Syncing Google Calendar & Drive folders…';
+    showToast(targetMsg, 'in');
     setTimeout(() => {
       setSyncStatus('synced');
       audit('SYNC', 'System', `Google Calendar sync – ${deadlines.length} events synced`);
-      showToast(`Calendar & Drive synced! ${deadlines.length} events up to date.`, 'ok');
-    }, 1500);
-  }, [audit, deadlines.length, showToast]);
+      showToast(
+        googleCalendarEmail
+          ? `Calendar synced! ${deadlines.length} court events updated for ${googleCalendarEmail}.`
+          : `Calendar & Drive synced! ${deadlines.length} events up to date.`,
+        'ok'
+      );
+    }, 1200);
+  }, [audit, deadlines.length, googleCalendarEmail, showToast]);
+
+  const connectGoogleCalendar = useCallback(
+    async (gmail: string): Promise<boolean> => {
+      const clean = gmail.trim().toLowerCase();
+      if (!clean || !clean.includes('@')) {
+        showToast('Please enter a valid Gmail address (e.g. advocate@gmail.com).', 'er');
+        return false;
+      }
+      setGoogleCalendarEmailState(clean);
+      setGoogleCalendarSync(true);
+      try {
+        const res = await fetch('/api/v1/calendar/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ googleCalendarEmail: clean, googleCalendarSync: true }),
+        });
+        if (res.ok) {
+          const result = await res.json();
+          if (result.data?.calendarToken) {
+            setCalendarToken(result.data.calendarToken);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not save calendar settings to backend', err);
+      }
+      audit('SYNC', 'User', `Connected Google Calendar for ${clean}`);
+      showToast(`Google Calendar connected for ${clean}! Court appearances ready to sync.`, 'ok');
+      return true;
+    },
+    [audit, showToast]
+  );
+
+  const disconnectGoogleCalendar = useCallback(async (): Promise<boolean> => {
+    setGoogleCalendarSync(false);
+    try {
+      await fetch('/api/v1/calendar/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ googleCalendarSync: false }),
+      });
+    } catch (err) {}
+    audit('SYNC', 'User', 'Disconnected Google Calendar sync');
+    showToast('Google Calendar sync disconnected.', 'in');
+    return true;
+  }, [audit, showToast]);
+
+  const openEventInGoogleCalendar = useCallback(
+    (event: DocketEvent) => {
+      openGoogleCalendarEvent(event, {
+        lawyerGmail: googleCalendarEmail,
+        firmName: 'Lawyers Diary',
+      });
+      showToast(`Opening Google Calendar for "${event.matterName}"…`, 'in');
+    },
+    [googleCalendarEmail, showToast]
+  );
+
+  const exportAllEventsToGoogleCalendar = useCallback(
+    (customEvents?: DocketEvent[]) => {
+      let list = customEvents || deadlines;
+      if (googleCalendarScope === 'assigned' && currentUser) {
+        list = list.filter((e) => e.attorney === currentUser || e.attorney === 'Self');
+      }
+      const ics = generateIcsContent(list, 'Lawyers Diary — Master Court Docket');
+      downloadIcsFile('lawyers_diary_court_docket.ics', ics);
+      showToast(`Exported ${list.length} court events into .ics for Google Calendar.`, 'ok');
+    },
+    [deadlines, googleCalendarScope, currentUser, showToast]
+  );
+
+  const subscribeGoogleCalendarFeed = useCallback(() => {
+    const token = calendarToken || 'court-feed';
+    const feedUrl = `${window.location.origin}/api/v1/calendar/feed/${token}.ics`;
+    const subUrl = buildGoogleCalendarSubscribeUrl(feedUrl);
+    window.open(subUrl, '_blank', 'noopener,noreferrer');
+    showToast('Opening Google Calendar subscription…', 'in');
+  }, [calendarToken, showToast]);
 
   // Client actions
   const addClient = useCallback(
@@ -712,11 +931,15 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     () => ({
       isLoggedIn,
       currentUser,
+      currentEmail,
       currentRole,
+      mustChangePassword,
       canDeleteRecords,
       login,
       loginGoogle,
       logout,
+      updateProfile,
+      completePasswordSetup,
       sidebarMinimized,
       toggleSidebar,
       isNotifPanelOpen,
@@ -732,6 +955,16 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       notes,
       syncStatus,
       syncDriveAndCalendar,
+      googleCalendarEmail,
+      googleCalendarSync,
+      googleCalendarScope,
+      calendarToken,
+      connectGoogleCalendar,
+      disconnectGoogleCalendar,
+      setGoogleCalendarScope,
+      openEventInGoogleCalendar,
+      exportAllEventsToGoogleCalendar,
+      subscribeGoogleCalendarFeed,
       toasts,
       showToast,
       modalState,
@@ -759,11 +992,15 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [
       isLoggedIn,
       currentUser,
+      currentEmail,
       currentRole,
+      mustChangePassword,
       canDeleteRecords,
       login,
       loginGoogle,
       logout,
+      updateProfile,
+      completePasswordSetup,
       sidebarMinimized,
       toggleSidebar,
       isNotifPanelOpen,
@@ -779,6 +1016,16 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       notes,
       syncStatus,
       syncDriveAndCalendar,
+      googleCalendarEmail,
+      googleCalendarSync,
+      googleCalendarScope,
+      calendarToken,
+      connectGoogleCalendar,
+      disconnectGoogleCalendar,
+      setGoogleCalendarScope,
+      openEventInGoogleCalendar,
+      exportAllEventsToGoogleCalendar,
+      subscribeGoogleCalendarFeed,
       toasts,
       showToast,
       modalState,

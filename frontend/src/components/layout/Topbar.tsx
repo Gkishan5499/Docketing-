@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLawyersDiary } from '../../context/LawyersDiaryContext';
 import { printDailyCauseList } from '../../utils/helpers';
@@ -11,6 +11,10 @@ import {
   Plus,
   ChevronRight,
   RefreshCw,
+  LogOut,
+  User,
+  Settings,
+  ShieldCheck,
 } from 'lucide-react';
 
 const pageTitles: Record<string, string> = {
@@ -56,11 +60,39 @@ export const Topbar: React.FC = () => {
     courtMatters,
     clients,
     deadlines,
+    currentUser,
+    currentRole,
+    logout,
   } = useLawyersDiary();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   const currentTitle = pageTitles[location.pathname] || 'Lawyers Diary';
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const initials = currentUser
+    ? currentUser.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+    : 'AD';
+
+  const roleLabel: Record<string, string> = {
+    FIRM_ADMIN: 'Firm Admin',
+    ATTORNEY: 'Attorney',
+    PARALEGAL: 'Paralegal',
+    STAFF: 'Staff',
+    VIEWER: 'Viewer',
+  };
 
   const handleSearch = (q: string) => {
     setSearchQuery(q);
@@ -95,6 +127,12 @@ export const Topbar: React.FC = () => {
   const handleGenerateCauseList = () => {
     printDailyCauseList(deadlines);
     showToast('Daily Cause list generated for printing', 'ok');
+  };
+
+  const handleLogout = () => {
+    setProfileOpen(false);
+    logout();
+    navigate('/login');
   };
 
   return (
@@ -184,7 +222,71 @@ export const Topbar: React.FC = () => {
           <Plus className="w-4 h-4" />
           <span>New Matter</span>
         </button>
+
+        {/* ── Account Avatar & Dropdown ── */}
+        <div className="tb-profile-wrap" ref={profileRef}>
+          <button
+            className="tb-avatar"
+            id="tb-avatar-btn"
+            onClick={() => setProfileOpen((o) => !o)}
+            title="Account"
+            aria-expanded={profileOpen}
+          >
+            {initials}
+          </button>
+
+          {profileOpen && (
+            <div className="tb-profile-dropdown" id="tb-profile-dropdown">
+              {/* Header */}
+              <div className="tb-profile-header">
+                <span className="tb-profile-avatar-lg">{initials}</span>
+                <div className="tb-profile-info">
+                  <strong>{currentUser || 'Advocate'}</strong>
+                  <span className="tb-role-badge">
+                    <ShieldCheck size={11} />
+                    {roleLabel[currentRole] ?? currentRole}
+                  </span>
+                </div>
+              </div>
+
+              <div className="tb-profile-divider" />
+
+              {/* Navigate to Edit Profile page */}
+              <button
+                className="tb-profile-action"
+                id="tb-edit-profile-btn"
+                onClick={() => { setProfileOpen(false); navigate('/edit-profile'); }}
+              >
+                <User size={14} />
+                Edit profile
+              </button>
+
+              {/* Navigate to Account Settings page */}
+              <button
+                className="tb-profile-action"
+                id="tb-account-settings-btn"
+                onClick={() => { setProfileOpen(false); navigate('/account-settings'); }}
+              >
+                <Settings size={14} />
+                Account settings
+              </button>
+
+              <div className="tb-profile-divider" />
+
+              {/* Logout */}
+              <button
+                className="tb-profile-action tb-logout"
+                id="tb-logout-btn"
+                onClick={handleLogout}
+              >
+                <LogOut size={14} />
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
 };
+

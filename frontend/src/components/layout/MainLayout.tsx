@@ -7,6 +7,7 @@ import { NotificationPanel } from './NotificationPanel';
 import { ToastContainer } from './ToastContainer';
 import { AddIprMatterModal } from '../modals/AddIprMatterModal';
 import { AddCourtMatterModal } from '../modals/AddCourtMatterModal';
+import { ForcePasswordChangeModal } from '../auth/ForcePasswordChangeModal';
 import { AddClientModal } from '../modals/AddClientModal';
 import { ClientDetailModal } from '../modals/ClientDetailModal';
 import { AddDocketModal } from '../modals/AddDocketModal';
@@ -38,6 +39,7 @@ export const MainLayout: React.FC = () => {
       <ToastContainer />
 
       {/* Interactive Modal System */}
+      <ForcePasswordChangeModal />
       <AddIprMatterModal />
       <AddCourtMatterModal />
       <AddClientModal />

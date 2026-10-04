@@ -14,7 +14,7 @@ const organizationSchema = new mongoose.Schema({
   logo: String,
   timezone: { type: String, default: 'UTC' },
   dateFormat: { type: String, default: 'yyyy-MM-dd' },
-  subscription: { type: String, default: 'trial' },
+  subscription: { type: String, enum: ['active', 'trial', 'suspended', 'cancelled'], default: 'trial' },
   plan: { type: String, enum: ['Solo Counsel', 'Chambers', 'Firm Office'], default: 'Solo Counsel' },
   seatsTotal: { type: Number, default: 1, min: 1 },
   seatsUsed: { type: Number, default: 1, min: 0 },

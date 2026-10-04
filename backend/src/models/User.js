@@ -14,6 +14,9 @@ const userSchema = new mongoose.Schema({
   emailVerified: { type: Boolean, default: false },
   mustChangePassword: { type: Boolean, default: true },
   permissions: [String],
+  googleCalendarEmail: { type: String, lowercase: true, trim: true },
+  googleCalendarSync: { type: Boolean, default: false },
+  calendarToken: { type: String, index: true },
 }, { timestamps: true });
 
 userSchema.index({ organizationId: 1, email: 1 }, { unique: true });

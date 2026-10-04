@@ -6,8 +6,8 @@ import { Link, useNavigate } from 'react-router-dom';
 export const LoginPage: React.FC = () => {
   const { login } = useLawyersDiary();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('advocate@lawyersdiary.in');
-  const [password, setPassword] = useState('diary123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,7 +51,7 @@ export const LoginPage: React.FC = () => {
             id="li-e"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="advocate@lawyersdiary.in"
+            placeholder="name@yourfirm.com"
             required
           />
           </div>
@@ -70,10 +70,6 @@ export const LoginPage: React.FC = () => {
             <button className="login-password-toggle" type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
-          </div>
-
-          <div className="login-demo-note">
-            Demo: <strong>advocate@lawyersdiary.in</strong> / <strong>diary123</strong>
           </div>
 
           <button type="submit" className="btn-login">

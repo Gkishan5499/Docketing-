@@ -19,6 +19,7 @@ export const OwnerSidebar: React.FC = () => {
   const navigate = useNavigate();
 
   const logout = () => {
+    fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     sessionStorage.removeItem("ld_owner_portal");
     navigate("/owner/login");
   };

@@ -61,7 +61,7 @@ export const OwnerManagementPage: React.FC = () => {
                 <KeyRound size={19} />
                 <h3>Open the access manager</h3>
                 <p>Provision individual lawyer credentials inside the selected firm workspace.</p>
-                <Link to="/team">Manage lawyer access <ArrowUpRight size={15} /></Link>
+                <Link to="/owner">Manage lawyer access <ArrowUpRight size={15} /></Link>
               </article>
             )}
             {section === "billing" && (

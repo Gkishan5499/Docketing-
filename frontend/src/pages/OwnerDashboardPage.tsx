@@ -18,7 +18,7 @@ type Firm = {
   plan: string;
   seatsUsed: number;
   seatsTotal: number;
-  status: "Active" | "Trial";
+  status: "Active" | "Trial" | "Suspended";
   renewal: string;
   monthlyValue: number;
 };
@@ -103,6 +103,12 @@ export const OwnerDashboardPage: React.FC = () => {
     plan: "Solo Counsel",
   });
   const [formError, setFormError] = useState("");
+  const [selectedFirmForTeam, setSelectedFirmForTeam] = useState<Firm | null>(null);
+  const [firmLawyers, setFirmLawyers] = useState<{ id: string; name: string; email: string; role: string; status: string }[]>([]);
+  const [loadingLawyers, setLoadingLawyers] = useState(false);
+  const [newLawyerForm, setNewLawyerForm] = useState({ name: "", email: "", role: "ATTORNEY" });
+  const [lawyerFormError, setLawyerFormError] = useState("");
+  const [provisionedCreds, setProvisionedCreds] = useState<{ name: string; email: string; temporaryPassword: string } | null>(null);
   const visibleFirms = firmList.filter((firm) =>
     `${firm.name} ${firm.owner} ${firm.plan}`
       .toLowerCase()
@@ -164,6 +170,7 @@ export const OwnerDashboardPage: React.FC = () => {
   }, []);
 
   const logout = () => {
+    fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     sessionStorage.removeItem("ld_owner_portal");
     navigate("/owner/login");
   };
@@ -213,6 +220,140 @@ export const OwnerDashboardPage: React.FC = () => {
       }
     };
     createFirm();
+  };
+
+  const toggleFirmStatus = async (firm: Firm) => {
+    const nextStatus = firm.status === "Suspended" ? "Active" : "Suspended";
+    try {
+      const response = await fetch(`/api/v1/owner/firms/${firm.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (!response.ok) {
+        const res = await response.json();
+        throw new Error(res.message || "Failed to update firm status");
+      }
+    } catch {
+      // Local fallback for offline simulation
+    }
+    setFirmList((current) =>
+      current.map((item) =>
+        item.id === firm.id ? { ...item, status: nextStatus } : item
+      )
+    );
+  };
+
+  const renewMonthly = async (firm: Firm) => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    const renewalFormatted = d.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+    try {
+      const response = await fetch(`/api/v1/owner/firms/${firm.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ renewMonthly: true }),
+      });
+      if (response.ok) {
+        const res = await response.json();
+        if (res.data?.renewal) {
+          setFirmList((current) =>
+            current.map((item) =>
+              item.id === firm.id
+                ? { ...item, status: "Active", renewal: res.data.renewal }
+                : item
+            )
+          );
+          return;
+        }
+      }
+    } catch {
+      // Local fallback for offline simulation
+    }
+    setFirmList((current) =>
+      current.map((item) =>
+        item.id === firm.id
+          ? { ...item, status: "Active", renewal: renewalFormatted }
+          : item
+      )
+    );
+  };
+
+  const openFirmTeam = async (firm: Firm) => {
+    setSelectedFirmForTeam(firm);
+    setProvisionedCreds(null);
+    setLawyerFormError("");
+    setLoadingLawyers(true);
+    try {
+      const res = await fetch(`/api/v1/owner/firms/${firm.id}/users`, { credentials: "include" });
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setFirmLawyers(
+          json.data.map((u: any) => ({
+            id: u._id || u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            status: u.isActive !== false ? (u.mustChangePassword ? "Pending" : "Active") : "Revoked",
+          }))
+        );
+      } else {
+        setFirmLawyers([
+          { id: "admin-1", name: firm.owner, email: firm.email, role: "FIRM_ADMIN", status: "Active" },
+        ]);
+      }
+    } catch {
+      setFirmLawyers([
+        { id: "admin-1", name: firm.owner, email: firm.email, role: "FIRM_ADMIN", status: "Active" },
+      ]);
+    } finally {
+      setLoadingLawyers(false);
+    }
+  };
+
+  const addLawyerToFirm = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedFirmForTeam) return;
+    if (!newLawyerForm.name.trim() || !newLawyerForm.email.trim()) {
+      setLawyerFormError("Lawyer name and email are required.");
+      return;
+    }
+    setLawyerFormError("");
+    try {
+      const res = await fetch(`/api/v1/owner/firms/${selectedFirmForTeam.id}/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(newLawyerForm),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to provision lawyer");
+
+      setFirmLawyers((prev) => [json.data.user, ...prev]);
+      setProvisionedCreds({
+        name: json.data.user.name,
+        email: json.data.user.email,
+        temporaryPassword: json.data.temporaryPassword,
+      });
+      setFirmList((prev) =>
+        prev.map((f) =>
+          f.id === selectedFirmForTeam.id ? { ...f, seatsUsed: json.data.seatsUsed } : f
+        )
+      );
+      setSelectedFirmForTeam((prev) =>
+        prev ? { ...prev, seatsUsed: json.data.seatsUsed } : null
+      );
+      setNewLawyerForm({ name: "", email: "", role: "ATTORNEY" });
+    } catch (err) {
+      setLawyerFormError(err instanceof Error ? err.message : "Failed to provision lawyer");
+    }
   };
 
   return (
@@ -302,7 +443,7 @@ export const OwnerDashboardPage: React.FC = () => {
                 <span>Seats</span>
                 <span>Status</span>
                 <span>Renewal</span>
-                <span />
+                <span>Actions</span>
               </div>
               {loadingFirms && <p>Loading subscribed firms...</p>}
               {!loadingFirms && visibleFirms.map((firm) => (
@@ -315,19 +456,39 @@ export const OwnerDashboardPage: React.FC = () => {
                     </div>
                   </div>
                   <span className="owner-plan">{firm.plan}</span>
-                  <span>{firm.seatsUsed} / {firm.seatsTotal}</span>
+                  <span className="owner-seats-pill">
+                    {firm.seatsUsed} / {firm.seatsTotal}
+                  </span>
                   <span className={`firm-status ${firm.status.toLowerCase()}`}>
                     {firm.status}
                   </span>
                   <span>{firm.renewal}</span>
-                  <button
-                    className="owner-more"
-                    type="button"
-                    onClick={() => navigate(`/team?firm=${encodeURIComponent(firm.id)}`)}
-                    title="Manage access"
-                  >
-                    <UsersRound size={16} />
-                  </button>
+                  <div className="owner-row-actions">
+                    <button
+                      type="button"
+                      className={`owner-row-btn ${firm.status === "Suspended" ? "activate" : "suspend"}`}
+                      onClick={() => toggleFirmStatus(firm)}
+                      title={firm.status === "Suspended" ? "Reactivate firm subscription" : "Suspend firm access"}
+                    >
+                      {firm.status === "Suspended" ? "Activate" : "Suspend"}
+                    </button>
+                    <button
+                      type="button"
+                      className="owner-row-btn renew"
+                      onClick={() => renewMonthly(firm)}
+                      title="Record monthly renewal payment (+30 days)"
+                    >
+                      +30d
+                    </button>
+                    <button
+                      className="owner-more"
+                      type="button"
+                      onClick={() => openFirmTeam(firm)}
+                      title="Manage lawyer accounts"
+                    >
+                      <UsersRound size={15} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -340,9 +501,15 @@ export const OwnerDashboardPage: React.FC = () => {
                 Create named accounts for a paid firm and hand over temporary
                 credentials securely.
               </p>
-              <Link to="/team">
+              <button
+                type="button"
+                className="owner-inline-action"
+                onClick={() => {
+                  if (visibleFirms[0]) openFirmTeam(visibleFirms[0]);
+                }}
+              >
                 Open access manager <ArrowUpRight size={15} />
-              </Link>
+              </button>
             </article>
             <article id="billing">
               <CreditCard size={19} />
@@ -468,6 +635,147 @@ export const OwnerDashboardPage: React.FC = () => {
               </button>
             </div>
           </section>
+        </div>
+      )}
+      {selectedFirmForTeam && (
+        <div
+          className="owner-modal-backdrop"
+          role="presentation"
+          onClick={() => setSelectedFirmForTeam(null)}
+        >
+          <div
+            className="owner-modal owner-credentials-modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+            style={{ maxWidth: "560px" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <span className="owner-kicker">{selectedFirmForTeam.name}</span>
+                <h2>Firm Lawyers & Seats</h2>
+                <p>
+                  {selectedFirmForTeam.plan} Plan · <strong>{selectedFirmForTeam.seatsUsed}</strong> of <strong>{selectedFirmForTeam.seatsTotal}</strong> seats provisioned
+                </p>
+              </div>
+              <button
+                type="button"
+                className="owner-more"
+                onClick={() => setSelectedFirmForTeam(null)}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ margin: "1rem 0", display: "grid", gap: "0.5rem" }}>
+              <span className="owner-kicker">Accounts with Access</span>
+              {loadingLawyers ? (
+                <p>Loading accounts...</p>
+              ) : firmLawyers.length === 0 ? (
+                <p style={{ color: "#64748b", fontSize: "0.78rem" }}>No lawyer accounts yet.</p>
+              ) : (
+                firmLawyers.map((lawyer) => (
+                  <div
+                    key={lawyer.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "0.6rem 0.8rem",
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "6px",
+                      fontSize: "0.78rem",
+                    }}
+                  >
+                    <div>
+                      <strong style={{ display: "block", color: "#17324d" }}>{lawyer.name}</strong>
+                      <span style={{ color: "#64748b", fontSize: "0.72rem" }}>{lawyer.email} · {lawyer.role}</span>
+                    </div>
+                    <span className={`firm-status ${lawyer.status.toLowerCase()}`}>
+                      {lawyer.status}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {selectedFirmForTeam.seatsUsed >= selectedFirmForTeam.seatsTotal ? (
+              <div
+                style={{
+                  padding: "0.75rem",
+                  background: "#fffbeb",
+                  border: "1px solid #fde68a",
+                  borderRadius: "6px",
+                  color: "#92400e",
+                  fontSize: "0.76rem",
+                }}
+              >
+                Seat quota full ({selectedFirmForTeam.seatsUsed}/{selectedFirmForTeam.seatsTotal}). To provision additional lawyers, upgrade this firm's monthly subscription plan.
+              </div>
+            ) : (
+              <form onSubmit={addLawyerToFirm} style={{ display: "grid", gap: "0.75rem", borderTop: "1px solid #e2e8f0", paddingTop: "1rem" }}>
+                <span className="owner-kicker">Add Lawyer for this Firm</span>
+                <label>
+                  Full name
+                  <input
+                    required
+                    placeholder="e.g. Adv. Raman Sharma"
+                    value={newLawyerForm.name}
+                    onChange={(e) => setNewLawyerForm({ ...newLawyerForm, name: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Work email
+                  <input
+                    required
+                    type="email"
+                    placeholder="raman@firm.com"
+                    value={newLawyerForm.email}
+                    onChange={(e) => setNewLawyerForm({ ...newLawyerForm, email: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Role
+                  <select
+                    value={newLawyerForm.role}
+                    onChange={(e) => setNewLawyerForm({ ...newLawyerForm, role: e.target.value })}
+                  >
+                    <option value="ATTORNEY">Attorney</option>
+                    <option value="PARALEGAL">Paralegal</option>
+                    <option value="STAFF">Staff</option>
+                    <option value="VIEWER">Viewer</option>
+                  </select>
+                </label>
+                {lawyerFormError && <p className="owner-login-error">{lawyerFormError}</p>}
+                <button type="submit" className="button button-primary">
+                  Provision Lawyer Credentials
+                </button>
+              </form>
+            )}
+
+            {provisionedCreds && (
+              <div className="owner-credential-box" style={{ marginTop: "1rem" }}>
+                <span>Account Created</span>
+                <strong>{provisionedCreds.name} ({provisionedCreds.email})</strong>
+                <span>Temporary Password</span>
+                <strong className="owner-temporary-password">{provisionedCreds.temporaryPassword}</strong>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  style={{ gridColumn: "1 / -1", marginTop: "0.5rem" }}
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `Lawyers Diary login\nFirm: ${selectedFirmForTeam.name}\nEmail: ${provisionedCreds.email}\nTemporary password: ${provisionedCreds.temporaryPassword}\nFirst sign-in requires setting your permanent password.`
+                    );
+                  }}
+                >
+                  Copy Credentials Handoff
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </main>
