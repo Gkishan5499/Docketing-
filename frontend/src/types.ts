@@ -91,6 +91,16 @@ export interface DocketEvent {
   notes?: string;
 }
 
+export interface VaultFolder {
+  id: string;
+  name: string;
+  path: string;
+  parentPath: string;
+  color?: string;
+  isSystem?: boolean;
+  createdAt?: string;
+}
+
 export interface DocumentFile {
   id: string;
   name: string;
@@ -102,6 +112,12 @@ export interface DocumentFile {
   date: string;
   uploadedAt?: string;
   tags?: string[];
+  fileUrl?: string;
+  downloadUrl?: string;
+  viewUrl?: string;
+  backendId?: string;
+  storageKey?: string;
+  isUploaded?: boolean;
 }
 
 export interface ActivityItem {

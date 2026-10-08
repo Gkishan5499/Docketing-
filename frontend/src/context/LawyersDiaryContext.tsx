@@ -5,6 +5,7 @@ import {
   CourtMatter,
   DocketEvent,
   DocumentFile,
+  VaultFolder,
   ActivityItem,
   AuditHistoryItem,
   WorkLogEntry,
@@ -19,6 +20,7 @@ import {
   initialCourtMatters,
   initialDeadlines,
   initialDocuments,
+  initialVaultFolders,
   initialActivities,
   initialAuditLogs,
   initialWorkLogs,
@@ -32,6 +34,7 @@ import {
   downloadIcsFile,
   buildGoogleCalendarSubscribeUrl,
 } from '../utils/calendarSync';
+import { storeFileInDb, removeFileFromDb } from '../utils/fileStorage';
 
 interface ModalState {
   type:
@@ -43,7 +46,9 @@ interface ModalState {
     | 'add-docket'
     | 'matter-detail'
     | 'log-time'
-    | 'note';
+    | 'note'
+    | 'create-folder'
+    | 'upload-doc';
   payload?: any;
 }
 
@@ -73,6 +78,7 @@ interface LawyersDiaryContextType {
   courtMatters: CourtMatter[];
   deadlines: DocketEvent[];
   documents: DocumentFile[];
+  vaultFolders: VaultFolder[];
   activities: ActivityItem[];
   auditLogs: AuditHistoryItem[];
   workLogs: WorkLogEntry[];
@@ -114,8 +120,12 @@ interface LawyersDiaryContextType {
   addDocketEvent: (event: Omit<DocketEvent, 'id'>) => void;
   deleteDocketEvent: (id: string) => void;
 
-  uploadDocuments: (files: FileList | File[]) => void;
+  createVaultFolder: (name: string, parentPath?: string, color?: string) => VaultFolder | null;
+  deleteVaultFolder: (pathOrId: string) => void;
+  uploadDocuments: (files: FileList | File[], targetFolder?: string, matterId?: string, tags?: string[]) => void;
+  uploadDocumentItem: (doc: Omit<DocumentFile, 'id'>) => DocumentFile;
   deleteDocument: (id: string) => void;
+  moveDocument: (id: string, targetFolder: string) => void;
 
   addWorkLog: (log: Omit<WorkLogEntry, 'id' | 'created'>) => void;
   updateWorkLog: (id: string, log: Partial<WorkLogEntry>) => void;
@@ -234,6 +244,9 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [documents, setDocuments] = useState<DocumentFile[]>(() =>
     loadFromStorage('documents', initialDocuments)
   );
+  const [vaultFolders, setVaultFolders] = useState<VaultFolder[]>(() =>
+    loadFromStorage('vaultFolders', initialVaultFolders)
+  );
   const [activities, setActivities] = useState<ActivityItem[]>(() =>
     loadFromStorage('activities', initialActivities)
   );
@@ -258,58 +271,170 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => saveToStorage('googleCalendarScope', googleCalendarScope), [googleCalendarScope]);
   useEffect(() => saveToStorage('calendarToken', calendarToken), [calendarToken]);
   useEffect(() => {
-    fetch('/api/v1/auth/me', { credentials: 'include' })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Session expired');
-        const result = await response.json();
-        const user = result.data;
-        if (user.role === 'SUPER_ADMIN') {
-          // SUPER_ADMIN belongs to the Owner Console (/owner), NOT lawyer workspace
+    let isCancelled = false;
+
+    const verifySession = async () => {
+      try {
+        let response = await fetch('/api/v1/auth/me', { credentials: 'include' });
+
+        // If 401, attempt silent token refresh
+        if (response.status === 401) {
+          try {
+            const refreshRes = await fetch('/api/v1/auth/refresh', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+            });
+            if (refreshRes.ok) {
+              response = await fetch('/api/v1/auth/me', { credentials: 'include' });
+            }
+          } catch {
+            // refresh attempt failed
+          }
+        }
+
+        if (isCancelled) return;
+
+        if (response.ok) {
+          const result = await response.json();
+          const user = result.data;
+          if (user.role === 'SUPER_ADMIN') {
+            // SUPER_ADMIN belongs to the Owner Console (/owner), NOT lawyer workspace
+            setIsLoggedIn(false);
+            setCurrentUser('');
+            setCurrentEmail('');
+            setCurrentRole('ATTORNEY');
+            return;
+          }
+          setCurrentUser(user.name);
+          if (user.email) setCurrentEmail(user.email);
+          setCurrentRole(user.role);
+          if (user.mustChangePassword !== undefined) {
+            setMustChangePassword(Boolean(user.mustChangePassword));
+          }
+          if (user.googleCalendarEmail) {
+            setGoogleCalendarEmailState(user.googleCalendarEmail);
+          } else if (user.email && user.email.toLowerCase().includes('@gmail.com') && !googleCalendarEmail) {
+            setGoogleCalendarEmailState(user.email.toLowerCase());
+          }
+          if (user.googleCalendarSync !== undefined) {
+            setGoogleCalendarSync(Boolean(user.googleCalendarSync));
+          }
+          if (user.calendarToken) {
+            setCalendarToken(user.calendarToken);
+          }
+          setIsLoggedIn(true);
+        } else if (response.status === 401 || response.status === 403) {
+          // Confirmed unauthenticated session by server
           setIsLoggedIn(false);
           setCurrentUser('');
-          setCurrentEmail('');
           setCurrentRole('ATTORNEY');
-          return;
+          setMustChangePassword(false);
+          localStorage.removeItem(`${STORAGE_PREFIX}isLoggedIn`);
+          localStorage.removeItem(`${STORAGE_PREFIX}currentUser`);
+          localStorage.removeItem(`${STORAGE_PREFIX}currentRole`);
+          localStorage.removeItem(`${STORAGE_PREFIX}mustChangePassword`);
         }
-        setCurrentUser(user.name);
-        if (user.email) setCurrentEmail(user.email);
-        setCurrentRole(user.role);
-        if (user.mustChangePassword !== undefined) {
-          setMustChangePassword(Boolean(user.mustChangePassword));
-        }
-        if (user.googleCalendarEmail) {
-          setGoogleCalendarEmailState(user.googleCalendarEmail);
-        } else if (user.email && user.email.toLowerCase().includes('@gmail.com') && !googleCalendarEmail) {
-          setGoogleCalendarEmailState(user.email.toLowerCase());
-        }
-        if (user.googleCalendarSync !== undefined) {
-          setGoogleCalendarSync(Boolean(user.googleCalendarSync));
-        }
-        if (user.calendarToken) {
-          setCalendarToken(user.calendarToken);
-        }
-        setIsLoggedIn(true);
-      })
-      .catch(() => {
-        setIsLoggedIn(false);
-        setCurrentUser('');
-        setCurrentRole('ATTORNEY');
-        setMustChangePassword(false);
-        localStorage.removeItem(`${STORAGE_PREFIX}isLoggedIn`);
-        localStorage.removeItem(`${STORAGE_PREFIX}currentUser`);
-        localStorage.removeItem(`${STORAGE_PREFIX}currentRole`);
-        localStorage.removeItem(`${STORAGE_PREFIX}mustChangePassword`);
-      });
+      } catch (err: any) {
+        // Network error, request aborted during navigation/rapid refresh, or offline:
+        // Do NOT wipe localStorage credentials! Retain session.
+        if (err?.name === 'AbortError') return;
+        console.warn('Session verification delayed or offline, retaining local session state:', err);
+      }
+    };
+
+    verifySession();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
+
+  // Periodic background session renewal (every 30 minutes) to maintain 1-day active session
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const interval = setInterval(async () => {
+      try {
+        await fetch('/api/v1/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+      } catch {
+        // Silent background retry next cycle
+      }
+    }, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
   useEffect(() => saveToStorage('clients', clients), [clients]);
   useEffect(() => saveToStorage('iprMatters', iprMatters), [iprMatters]);
   useEffect(() => saveToStorage('courtMatters', courtMatters), [courtMatters]);
   useEffect(() => saveToStorage('deadlines', deadlines), [deadlines]);
   useEffect(() => saveToStorage('documents', documents), [documents]);
+  useEffect(() => saveToStorage('vaultFolders', vaultFolders), [vaultFolders]);
   useEffect(() => saveToStorage('activities', activities), [activities]);
   useEffect(() => saveToStorage('auditLogs', auditLogs), [auditLogs]);
   useEffect(() => saveToStorage('workLogs', workLogs), [workLogs]);
   useEffect(() => saveToStorage('notes', notes), [notes]);
+
+  // Synchronize real uploaded files from backend into documents state
+  useEffect(() => {
+    let mounted = true;
+    const fetchBackendDocuments = async () => {
+      try {
+        const res = await fetch('/api/v1/documents/list', { credentials: 'include' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!mounted || !json?.data || !Array.isArray(json.data)) return;
+
+        const backendDocs: DocumentFile[] = json.data.map((bd: any) => ({
+          id: bd._id,
+          backendId: bd._id,
+          name: bd.name || bd.originalName,
+          matterId: bd.matterId || '',
+          matterName: bd.matterName || 'General Legal Practice',
+          folder: bd.folderPath || '/LawyersDiary',
+          type: bd.fileType || 'pdf',
+          size:
+            bd.fileSize > 1024 * 1024
+              ? `${(bd.fileSize / (1024 * 1024)).toFixed(1)} MB`
+              : `${Math.max(1, Math.round(bd.fileSize / 1024))} KB`,
+          date: bd.createdAt ? bd.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+          uploadedAt: bd.createdAt ? bd.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+          tags: bd.tags && bd.tags.length > 0 ? bd.tags : ['Uploaded'],
+          downloadUrl: bd.downloadUrl || `/api/v1/documents/${bd._id}/download`,
+          viewUrl: bd.viewUrl || `/api/v1/documents/${bd._id}/view`,
+          storageKey: bd.storageKey,
+          isUploaded: true,
+        }));
+
+        setDocuments((prev) => {
+          const map = new Map<string, DocumentFile>();
+          prev.forEach((d) => map.set(d.name, d));
+          backendDocs.forEach((bd) => {
+            const existing = map.get(bd.name);
+            if (existing) {
+              map.set(bd.name, {
+                ...existing,
+                ...bd,
+                folder: existing.folder || bd.folder,
+              });
+            } else {
+              map.set(bd.name, bd);
+            }
+          });
+          return Array.from(map.values());
+        });
+      } catch {
+        // Ignore network failure
+      }
+    };
+
+    fetchBackendDocuments();
+    return () => {
+      mounted = false;
+    };
+  }, [isLoggedIn]);
 
   // Toast helper
   const showToast = useCallback((text: string, type: 'ok' | 'er' | 'in' = 'in') => {
@@ -762,42 +887,198 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [audit, canDeleteRecords, showToast]
   );
 
-  // Documents
+  // Vault Folders & Documents
+  const createVaultFolder = useCallback(
+    (name: string, parentPath: string = '/LawyersDiary', color: string = '#38bdf8'): VaultFolder | null => {
+      const cleanName = name.trim().replace(/[\\/:*?"<>|]/g, '_');
+      if (!cleanName) {
+        showToast('Folder name cannot be empty', 'er');
+        return null;
+      }
+      const cleanParent = parentPath.endsWith('/') && parentPath.length > 1 ? parentPath.slice(0, -1) : parentPath;
+      const fullPath = cleanParent === '/' ? `/${cleanName}` : `${cleanParent}/${cleanName}`;
+
+      if (vaultFolders.some((f) => f.path.toLowerCase() === fullPath.toLowerCase())) {
+        showToast(`Folder "${cleanName}" already exists in ${cleanParent}`, 'er');
+        return null;
+      }
+
+      const newFolder: VaultFolder = {
+        id: gid('vf'),
+        name: cleanName,
+        path: fullPath,
+        parentPath: cleanParent,
+        color,
+        isSystem: false,
+        createdAt: new Date().toISOString().split('T')[0],
+      };
+
+      setVaultFolders((prev) => [...prev, newFolder]);
+      audit('CREATE', 'Folder', `Created folder ${fullPath}`);
+      showToast(`Folder "${cleanName}" created!`, 'ok');
+      return newFolder;
+    },
+    [audit, showToast, vaultFolders]
+  );
+
+  const deleteVaultFolder = useCallback(
+    (pathOrId: string) => {
+      const target = vaultFolders.find((f) => f.id === pathOrId || f.path === pathOrId);
+      if (!target) return;
+      if (target.isSystem && target.path === '/LawyersDiary') {
+        showToast('Root vault folder cannot be deleted', 'er');
+        return;
+      }
+
+      const targetPath = target.path;
+      setVaultFolders((prev) => prev.filter((f) => f.path !== targetPath && !f.path.startsWith(targetPath + '/')));
+
+      setDocuments((prev) =>
+        prev.map((doc) => {
+          if (doc.folder && (doc.folder === targetPath || doc.folder.startsWith(targetPath + '/'))) {
+            return { ...doc, folder: target.parentPath || '/LawyersDiary' };
+          }
+          return doc;
+        })
+      );
+
+      audit('DELETE', 'Folder', `Deleted folder ${targetPath}`);
+      showToast(`Folder "${target.name}" deleted`, 'in');
+    },
+    [audit, showToast, vaultFolders]
+  );
+
   const uploadDocuments = useCallback(
-    (files: FileList | File[]) => {
+    (files: FileList | File[], targetFolder: string = '/LawyersDiary', matterId: string = '', tags: string[] = []) => {
       const fileArray = Array.from(files);
+      if (fileArray.length === 0) return;
+
+      const m = matterId ? (iprMatters.find((x) => x.id === matterId) || courtMatters.find((x) => x.id === matterId)) : null;
+      const matterName = m ? ('mark' in m ? `${m.mark} (${m.clientName})` : `${m.caseTitle} (${m.clientName})`) : 'General Legal Practice';
+
       const added: DocumentFile[] = [];
       fileArray.forEach((f) => {
         const ext = f.name.split('.').pop()?.toLowerCase() || 'doc';
+        const docId = gid('f');
+
+        // Store real file blob in IndexedDB for immediate offline/refresh resilience
+        storeFileInDb(docId, f, f.name);
+
+        let fileUrl = '';
+        try {
+          fileUrl = URL.createObjectURL(f);
+        } catch {
+          fileUrl = '';
+        }
+
         const doc: DocumentFile = {
-          id: gid('f'),
+          id: docId,
           name: f.name,
-          matterId: '',
-          matterName: 'Unassigned Matter',
-          folder: 'Pleadings',
+          matterId,
+          matterName,
+          folder: targetFolder,
           type: ext,
-          size: `${(f.size / (1024 * 1024)).toFixed(1)} MB`,
+          size: f.size > 1024 * 1024 ? `${(f.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(f.size / 1024))} KB`,
           date: new Date().toISOString().split('T')[0],
           uploadedAt: new Date().toISOString().split('T')[0],
-          tags: ['Uploaded'],
+          tags: tags.length > 0 ? tags : ['Uploaded', ext.toUpperCase()],
+          fileUrl,
+          downloadUrl: `/api/v1/documents/${encodeURIComponent(f.name)}/download`,
+          viewUrl: `/api/v1/documents/${encodeURIComponent(f.name)}/view`,
+          isUploaded: true,
         };
         added.push(doc);
+
+        try {
+          const formData = new FormData();
+          formData.append('file', f);
+          if (matterId) formData.append('matterId', matterId);
+          formData.append('name', f.name);
+          formData.append('folder', targetFolder);
+          formData.append('tags', (doc.tags || []).join(','));
+          fetch('/api/v1/documents/upload', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((resJson) => {
+              if (resJson?.data?._id) {
+                setDocuments((prev) =>
+                  prev.map((d) =>
+                    d.id === docId
+                      ? {
+                          ...d,
+                          backendId: resJson.data._id,
+                          storageKey: resJson.data.storageKey,
+                          downloadUrl: resJson.data.downloadUrl || `/api/v1/documents/${resJson.data._id}/download`,
+                          viewUrl: resJson.data.viewUrl || `/api/v1/documents/${resJson.data._id}/view`,
+                          isUploaded: true,
+                        }
+                      : d
+                  )
+                );
+              }
+            })
+            .catch(() => {});
+        } catch {
+          // ignore background sync errors
+        }
       });
+
       setDocuments((prev) => [...added, ...prev]);
-      audit('UPLOAD', 'Document', `${added.length} file(s) uploaded`);
-      showToast(`${added.length} file(s) uploaded to Drive!`, 'ok');
+      audit('UPLOAD', 'Document', `${added.length} file(s) uploaded into ${targetFolder}`);
+      showToast(`${added.length} file(s) uploaded into ${targetFolder.split('/').pop() || 'folder'}!`, 'ok');
+    },
+    [audit, courtMatters, iprMatters, showToast]
+  );
+
+  const uploadDocumentItem = useCallback(
+    (docData: Omit<DocumentFile, 'id'>): DocumentFile => {
+      const newDoc: DocumentFile = {
+        ...docData,
+        id: gid('f'),
+        uploadedAt: docData.uploadedAt || new Date().toISOString().split('T')[0],
+      };
+      setDocuments((prev) => [newDoc, ...prev]);
+      audit('UPLOAD', 'Document', `Uploaded ${newDoc.name} into ${newDoc.folder || 'Vault'}`);
+      showToast(`Document "${newDoc.name}" uploaded successfully!`, 'ok');
+      return newDoc;
+    },
+    [audit, showToast]
+  );
+
+  const moveDocument = useCallback(
+    (id: string, targetFolder: string) => {
+      setDocuments((prev) =>
+        prev.map((d) => (d.id === id ? { ...d, folder: targetFolder } : d))
+      );
+      audit('UPDATE', 'Document', `Moved document ${id} to ${targetFolder}`);
+      showToast(`Document moved to ${targetFolder.split('/').pop() || targetFolder}`, 'ok');
     },
     [audit, showToast]
   );
 
   const deleteDocument = useCallback(
     (id: string) => {
-      if (!canDeleteRecords) return;
+      const doc = documents.find((d) => d.id === id);
+      removeFileFromDb(id);
+      if (doc?.backendId) {
+        fetch(`/api/v1/documents/${doc.backendId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        }).catch(() => {});
+      } else if (doc?.name) {
+        fetch(`/api/v1/documents/${encodeURIComponent(doc.name)}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        }).catch(() => {});
+      }
       setDocuments((prev) => prev.filter((d) => d.id !== id));
-      audit('DELETE', 'Document', `Doc ${id}`);
-      showToast('Document deleted', 'in');
+      audit('DELETE', 'Document', `Doc ${doc?.name || id}`);
+      showToast('Document deleted from vault', 'in');
     },
-    [audit, canDeleteRecords, showToast]
+    [audit, documents, showToast]
   );
 
   // Work Log
@@ -978,8 +1259,13 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       deleteCourtMatter,
       addDocketEvent,
       deleteDocketEvent,
+      vaultFolders,
+      createVaultFolder,
+      deleteVaultFolder,
       uploadDocuments,
+      uploadDocumentItem,
       deleteDocument,
+      moveDocument,
       addWorkLog,
       updateWorkLog,
       deleteWorkLog,
@@ -1010,6 +1296,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       courtMatters,
       deadlines,
       documents,
+      vaultFolders,
       activities,
       auditLogs,
       workLogs,
@@ -1039,8 +1326,12 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       deleteCourtMatter,
       addDocketEvent,
       deleteDocketEvent,
+      createVaultFolder,
+      deleteVaultFolder,
       uploadDocuments,
+      uploadDocumentItem,
       deleteDocument,
+      moveDocument,
       addWorkLog,
       updateWorkLog,
       deleteWorkLog,

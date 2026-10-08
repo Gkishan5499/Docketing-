@@ -25,7 +25,6 @@ const definitions = [
   { path: '/deadlines', controller: controllers.deadline },
   { path: '/hearings', controller: controllers.hearing },
   { path: '/tasks', controller: controllers.task },
-  { path: '/documents', controller: controllers.document },
   { path: '/notes', controller: controllers.note },
   { path: '/work-logs', controller: controllers.workLog },
 ];

@@ -14,6 +14,8 @@ import { AddDocketModal } from '../modals/AddDocketModal';
 import { MatterDetailModal } from '../modals/MatterDetailModal';
 import { LogTimeModal } from '../modals/LogTimeModal';
 import { NoteModal } from '../modals/NoteModal';
+import { CreateFolderModal } from '../modals/CreateFolderModal';
+import { UploadDocumentModal } from '../modals/UploadDocumentModal';
 
 export const MainLayout: React.FC = () => {
   const { currentUser, isLoggedIn } = useLawyersDiary();
@@ -48,6 +50,8 @@ export const MainLayout: React.FC = () => {
       <MatterDetailModal />
       <LogTimeModal />
       <NoteModal />
+      <CreateFolderModal />
+      <UploadDocumentModal />
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import { DocumentFile } from '../types';
+import { getFileFromDb } from './fileStorage';
 
 export const MS = [
   'January',
@@ -202,6 +203,106 @@ export const printDailyCauseList = (deadlines: Array<{
   }).join('')}</tbody></table><p style="font-size:.7rem;color:#aaa;margin-top:2rem;border-top:1px solid #e0e0e0;padding-top:1rem">Lawyers Diary · ${now.toLocaleString()}</p></body></html>`);
   w.document.close();
   w.print();
+};
+
+export const downloadDocumentFile = async (doc: DocumentFile) => {
+  // 1. Try local IndexedDB
+  const local = await getFileFromDb(doc.id);
+  if (local && local.file) {
+    const blobUrl = URL.createObjectURL(local.file);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = doc.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    return;
+  }
+
+  // 2. Try downloadUrl or backendId or isUploaded
+  if (doc.downloadUrl || doc.backendId || doc.isUploaded) {
+    const targetUrl = doc.downloadUrl || `/api/v1/documents/${doc.backendId || encodeURIComponent(doc.name)}/download`;
+    const a = document.createElement('a');
+    a.href = targetUrl;
+    a.download = doc.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return;
+  }
+
+  // 3. Try checking backend by name
+  try {
+    const directUrl = `/api/v1/documents/${encodeURIComponent(doc.name)}/download`;
+    const res = await fetch(directUrl, { credentials: 'include' });
+    if (res.ok) {
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = doc.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      return;
+    }
+  } catch {
+    // fallback below
+  }
+
+  // 4. If valid non-blob fileUrl exists
+  if (doc.fileUrl && !doc.fileUrl.startsWith('blob:')) {
+    const a = document.createElement('a');
+    a.href = doc.fileUrl;
+    a.download = doc.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return;
+  }
+
+  // 5. Fallback for mock seed data only
+  downloadDocumentPdf(doc);
+};
+
+export const openDocumentFile = async (doc: DocumentFile) => {
+  // 1. Try local IndexedDB
+  const local = await getFileFromDb(doc.id);
+  if (local && local.file) {
+    const blobUrl = URL.createObjectURL(local.file);
+    window.open(blobUrl, '_blank');
+    return;
+  }
+
+  // 2. Try viewUrl or backendId or isUploaded
+  if (doc.viewUrl || doc.backendId || doc.isUploaded) {
+    const targetUrl = doc.viewUrl || `/api/v1/documents/${doc.backendId || encodeURIComponent(doc.name)}/view`;
+    window.open(targetUrl, '_blank');
+    return;
+  }
+
+  // 3. Try checking backend by name
+  try {
+    const directUrl = `/api/v1/documents/${encodeURIComponent(doc.name)}/view`;
+    const res = await fetch(directUrl, { credentials: 'include', method: 'HEAD' });
+    if (res.ok) {
+      window.open(directUrl, '_blank');
+      return;
+    }
+  } catch {
+    // fallback below
+  }
+
+  // 4. If valid non-blob fileUrl exists
+  if (doc.fileUrl && !doc.fileUrl.startsWith('blob:')) {
+    window.open(doc.fileUrl, '_blank');
+    return;
+  }
+
+  // 5. Fallback for mock seed data only
+  downloadDocumentPdf(doc);
 };
 
 export const downloadDocumentPdf = (doc: DocumentFile) => {

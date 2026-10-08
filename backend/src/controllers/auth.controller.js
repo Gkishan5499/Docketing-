@@ -2,20 +2,9 @@ const bcrypt = require('bcryptjs');
 const crypto = require('node:crypto');
 const jwt = require('jsonwebtoken');
 const { Organization, User } = require('../models');
-const { signAccess, signRefresh, ok, fail } = require('../utils');
+const { signAccess, signRefresh, cookieOptions, setAuthCookies, clearAuthCookies, ok, fail } = require('../utils');
 const env = require('../config/env');
 
-const cookieOptions = {
-  httpOnly: true,
-  sameSite: 'lax',
-  secure: env.nodeEnv === 'production',
-  ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
-};
-
-function setAuthCookies(res, user) {
-  res.cookie('accessToken', signAccess(user), { ...cookieOptions, maxAge: 15 * 60 * 1000 });
-  res.cookie('refreshToken', signRefresh(user, crypto.randomUUID()), { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
-}
 
 function publicUser(user) {
   return {
@@ -66,14 +55,13 @@ async function login(req, res, next) {
 }
 
 function logout(req, res) {
-  res.clearCookie('accessToken', cookieOptions);
-  res.clearCookie('refreshToken', cookieOptions);
+  clearAuthCookies(res);
   ok(res, null, 'Logged out successfully');
 }
 
 async function refresh(req, res, next) {
   try {
-    const token = req.cookies?.refreshToken || req.body.refreshToken;
+    const token = req.cookies?.refreshToken || req.body?.refreshToken;
     if (!token) throw fail('Refresh token required', 401, 'AUTH_REQUIRED');
     const payload = jwt.verify(token, env.refreshSecret);
     const user = await User.findOne({ _id: payload.sub, isActive: true });

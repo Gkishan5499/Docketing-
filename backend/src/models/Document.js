@@ -14,6 +14,7 @@ const documentSchema = new mongoose.Schema({
   storageProvider: { type: String, default: 'local' },
   uploadedBy: userRef,
   documentType: String,
+  folderPath: { type: String, default: '/LawyersDiary' },
   version: { type: Number, default: 1 },
   tags: [String],
   isArchived: { type: Boolean, default: false },

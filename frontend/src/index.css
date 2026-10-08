@@ -68,7 +68,7 @@
   --sh-modal: 0 20px 25px -5px rgba(15, 23, 42, 0.18), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
 
   /* Layout dimensions & Fonts */
-  --sw: 248px;
+  --sw: 268px;
   --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --serif: 'Cormorant Garamond', 'Libre Baskerville', Georgia, serif;
 }
@@ -186,13 +186,20 @@ button, input, select, textarea {
 #sb.mi .sec,
 #sb.mi .btx,
 #sb.mi .udt,
-#sb.mi .nbd {
+#sb.mi .nbd,
+#sb.mi .sb-main-label,
+#sb.mi .sb-chevron,
+#sb.mi .sb-main-badge,
+#sb.mi .sb-sub-menu {
   display: none !important;
 }
 
-#sb.mi .ni {
+#sb.mi .ni,
+#sb.mi .sb-main-item {
   justify-content: center;
   padding: 0.65rem 0.5rem;
+  margin: 2px 4px;
+  width: calc(100% - 8px);
 }
 
 #sb.mi .bw {
@@ -237,7 +244,7 @@ button, input, select, textarea {
 
 .bn2 {
   font-family: var(--serif);
-  font-size: 1.15rem;
+  font-size: 1.22rem;
   font-weight: 700;
   line-height: 1.1;
   color: #ffffff;
@@ -249,7 +256,7 @@ button, input, select, textarea {
 }
 
 .bsb {
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #94a3b8;
@@ -354,6 +361,194 @@ button, input, select, textarea {
 .nbd.sl { background: var(--sl); }
 .nbd.pr { background: #1e3a8a; }
 
+/* ── Sidebar Hierarchical Main & Submenu Navigation ─────── */
+.sb-section-group {
+  margin-bottom: 3px;
+}
+
+.sb-main-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.58rem 0.85rem 0.58rem 0.95rem;
+  margin: 1px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+  border: none;
+  background: transparent;
+  width: calc(100% - 16px);
+  text-align: left;
+  color: #94a3b8;
+  border-left: 3px solid transparent;
+}
+
+.sb-main-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+}
+
+.sb-main-item.is-open {
+  color: #cbd5e1;
+}
+
+.sb-main-item.has-active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: var(--gd);
+}
+
+.sb-main-item.has-active .sb-main-ic {
+  color: var(--gd);
+}
+
+.sb-main-ic {
+  width: 19px;
+  height: 19px;
+  color: #64748b;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sb-main-item:hover .sb-main-ic {
+  color: #cbd5e1;
+}
+
+.sb-main-label {
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: inherit;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+.sb-chevron {
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+  flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s;
+}
+
+.sb-main-item:hover .sb-chevron {
+  color: #cbd5e1;
+}
+
+.sb-chevron.open {
+  transform: rotate(0deg);
+}
+
+.sb-chevron.closed {
+  transform: rotate(-90deg);
+}
+
+.sb-main-badge {
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  padding: 0.1rem 0.48rem;
+  border-radius: 999px;
+  min-width: 20px;
+  text-align: center;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.sb-main-item.has-active .sb-main-badge {
+  background: rgba(197, 155, 76, 0.22);
+  color: var(--gd);
+}
+
+/* Submenu Dropdown Container */
+.sb-sub-menu {
+  display: flex;
+  flex-direction: column;
+  margin-left: 1.85rem;
+  padding-left: 0.75rem;
+  border-left: 1.5px solid rgba(255, 255, 255, 0.09);
+  margin-top: 3px;
+  margin-bottom: 6px;
+  animation: sbSubmenuSlide 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sbSubmenuSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Submenu Dropdown Item */
+.sb-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.46rem 0.75rem;
+  margin: 1px 0;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.sb-sub-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+}
+
+.sb-sub-item.on {
+  background: linear-gradient(90deg, rgba(197, 155, 76, 0.18) 0%, rgba(197, 155, 76, 0.04) 100%);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--gd);
+}
+
+.sb-sub-item.on .sb-sub-ic {
+  color: var(--gd);
+}
+
+.sb-sub-ic {
+  width: 15px;
+  height: 15px;
+  color: #64748b;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sb-sub-item:hover .sb-sub-ic {
+  color: #cbd5e1;
+}
+
+.sb-sub-label {
+  font-size: 0.88rem;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Sidebar User Footer */
 .sft {
   flex-shrink: 0;
@@ -378,17 +573,17 @@ button, input, select, textarea {
 }
 
 .un {
-  font-size: 0.8rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+  max-width: 130px;
 }
 
 .uro {
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -2024,6 +2219,81 @@ select {
 
 .ft .dir { color: #38bdf8; font-weight: 600; }
 .ft .sym { color: #475569; }
+
+.ft-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ft-node {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.28rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+.ft-node:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ft-node.active {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.ft-node .ft-actions {
+  display: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.ft-node:hover .ft-actions {
+  display: flex;
+}
+
+.ft-action-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 4px;
+  color: #e2e8f0;
+  padding: 3px 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s ease;
+}
+
+.ft-action-btn:hover {
+  background: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+}
+
+.ft-action-btn.del:hover {
+  background: rgba(244, 63, 94, 0.35);
+  color: #f43f5e;
+}
+
+.ft-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.ft-node.active .ft-badge {
+  background: rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+}
+
 
 /* Login Page Styling */
 #login {

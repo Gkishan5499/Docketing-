@@ -18,6 +18,9 @@ const upload = multer({
 });
 
 router.post('/upload', auth, upload.single('file'), controller.upload);
+router.get('/list', auth, controller.list);
 router.get('/:id/download', auth, controller.download);
+router.get('/:id/view', auth, controller.view);
+router.delete('/:id', auth, controller.remove);
 
 module.exports = router;
