@@ -28,6 +28,10 @@ import {
   CheckCircle2,
   UserPlus,
   ChevronDown,
+  Hammer,
+  MailCheck,
+  SendHorizontal,
+  Inbox,
 } from 'lucide-react';
 
 interface SubMenuItem {
@@ -86,6 +90,7 @@ export const Sidebar: React.FC = () => {
         { path: '/hc', label: 'High Court', icon: Building2 },
         { path: '/dc', label: 'District Court', icon: Scale },
         { path: '/cc', label: 'Consumer Forum', icon: ShieldAlert },
+        { path: '/lc', label: 'Other (Labour Court etc.)', icon: Hammer },
       ],
     },
     {
@@ -99,6 +104,16 @@ export const Sidebar: React.FC = () => {
         { path: '/drt', label: 'DRT / DRAT', icon: Landmark },
         { path: '/cat', label: 'CAT', icon: Layers },
         { path: '/arb', label: 'Arbitration', icon: Gavel },
+      ],
+    },
+    {
+      id: 'legal-notices',
+      label: 'Legal Notices',
+      icon: MailCheck,
+      items: [
+        { path: '/ln', label: 'All Notices', icon: MailCheck },
+        { path: '/ln/outward', label: 'Outward (Sent)', icon: SendHorizontal },
+        { path: '/ln/inward', label: 'Inward (Received)', icon: Inbox },
       ],
     },
     {

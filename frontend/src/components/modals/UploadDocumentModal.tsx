@@ -6,6 +6,7 @@ interface UploadDocumentModalProps {
   isOpen?: boolean;
   onClose?: () => void;
   defaultFolder?: string;
+  defaultMatterId?: string;
   onSuccess?: () => void;
   onOpenCreateFolder?: (currentFolder: string) => void;
 }
@@ -14,6 +15,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   isOpen: propIsOpen,
   onClose: propOnClose,
   defaultFolder: propFolder,
+  defaultMatterId: propMatterId,
   onSuccess,
   onOpenCreateFolder,
 }) => {
@@ -33,11 +35,12 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
 
   const contextFolder = modalState.payload?.folderPath || modalState.payload?.folder;
   const initialFolder = propFolder || contextFolder || '/LawyersDiary';
+  const initialMatterId = propMatterId || modalState.payload?.matterId || (typeof modalState.payload === 'string' ? modalState.payload : '');
 
   const [selectedFolder, setSelectedFolder] = useState(initialFolder);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [customName, setCustomName] = useState('');
-  const [matterId, setMatterId] = useState('');
+  const [matterId, setMatterId] = useState(initialMatterId);
   const [categoryTag, setCategoryTag] = useState('Pleadings');
   const [isDragging, setIsDragging] = useState(false);
 
@@ -46,11 +49,11 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       setSelectedFolder(propFolder || contextFolder || '/LawyersDiary');
       setSelectedFiles([]);
       setCustomName('');
-      setMatterId('');
+      setMatterId(propMatterId || modalState.payload?.matterId || (typeof modalState.payload === 'string' ? modalState.payload : ''));
       setCategoryTag('Pleadings');
       setIsDragging(false);
     }
-  }, [isOpen, propFolder, contextFolder]);
+  }, [isOpen, propFolder, contextFolder, propMatterId, modalState.payload]);
 
   if (!isOpen) return null;
 
@@ -115,7 +118,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   ];
 
   return (
-    <div className="ov op" onClick={(e) => e.target === e.currentTarget && handleClose()}>
+    <div className="ov op" style={{ zIndex: 1060 }} onClick={(e) => e.target === e.currentTarget && handleClose()}>
       <div className="mo md">
         <div className="mh">
           <div className="flex items-center gap-2.5">

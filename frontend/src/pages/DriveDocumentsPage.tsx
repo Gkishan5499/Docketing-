@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLawyersDiary } from '../context/LawyersDiaryContext';
 import { downloadDocumentFile, openDocumentFile } from '../utils/helpers';
 import { CreateFolderModal } from '../components/modals/CreateFolderModal';
@@ -46,6 +47,23 @@ export const DriveDocumentsPage: React.FC = () => {
     '/LawyersDiary/Clients': true,
     '/LawyersDiary/Clients/Rajan & Sons Pvt. Ltd.': true,
   });
+  const [searchParams] = useSearchParams();
+  const folderParam = searchParams.get('folder');
+
+  useEffect(() => {
+    if (folderParam) {
+      setSelectedFolder(folderParam);
+      const segments = folderParam.split('/').filter(Boolean);
+      let cur = '';
+      const toExp: Record<string, boolean> = { '/LawyersDiary': true, '/LawyersDiary/Clients': true };
+      segments.forEach((s) => {
+        cur += '/' + s;
+        toExp[cur] = true;
+      });
+      setExpandedFolders((prev) => ({ ...prev, ...toExp }));
+    }
+  }, [folderParam]);
+
   const [filterType, setFilterType] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 

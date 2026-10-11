@@ -14,4 +14,5 @@ module.exports = {
   AuditLog: require('./AuditLog'),
   Note: require('./Note'),
   WorkLog: require('./WorkLog'),
+  LegalNotice: require('./LegalNotice'),
 };

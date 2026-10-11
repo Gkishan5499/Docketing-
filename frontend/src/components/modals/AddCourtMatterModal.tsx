@@ -8,6 +8,7 @@ const CRT_NAMES: Record<CourtType, string> = {
   HC: 'High Court',
   DC: 'District Court',
   CC: 'Consumer Forum',
+  LC: 'Other (Labour Court etc.)',
   NGT: 'NGT',
   NCLT: 'NCLT / NCLAT',
   ITAT: 'ITAT',
@@ -15,6 +16,35 @@ const CRT_NAMES: Record<CourtType, string> = {
   CAT: 'CAT',
   ARB: 'Arbitration',
 };
+
+const LC_FORUMS = [
+  'Central Govt Industrial Tribunal (CGIT)',
+  'Labour Court - Rouse Avenue, Delhi',
+  'Labour Court - Bandra, Mumbai',
+  'State Industrial Tribunal',
+  'Office of Labour Commissioner / Conciliation Officer',
+  'Family Court',
+  'Motor Accident Claims Tribunal (MACT)',
+  'Revenue Court / SDM Court',
+  'Special CBI / PMLA Court',
+  'Armed Forces Tribunal (AFT)',
+  'Real Estate Regulatory Authority (RERA)',
+  'Other Specialized Court',
+];
+
+const LC_NATURE = [
+  'Industrial Dispute / Termination',
+  'Retrenchment & Layoff Dispute',
+  'Gratuity & PF Payment Claim',
+  'Workmen Compensation & Injury Claim',
+  'Domestic Inquiry / Disciplinary Proceedings',
+  'Unfair Labour Practice (ULP)',
+  'Wages & Bonus Recovery Claim',
+  'Matrimonial / Maintenance (Family Court)',
+  'Motor Accident Compensation Claim (MACT)',
+  'Revenue / Tenancy / Mutation Matter',
+  'Other',
+];
 
 const SC_NATURE = [
   'SLP (Civil)',
@@ -27,6 +57,7 @@ const SC_NATURE = [
   'Curative Petition',
   'Transfer Petition',
   'Contempt Petition',
+  'Other',
 ];
 
 const HC_COURTS = [
@@ -71,6 +102,10 @@ export const AddCourtMatterModal: React.FC = () => {
   const [court, setCourt] = useState('');
   const [bench, setBench] = useState('Single Bench');
   const [nature, setNature] = useState('Writ Petition (Civil)');
+  const [customNature, setCustomNature] = useState('');
+  const [courtNo, setCourtNo] = useState('');
+  const [judgeName, setJudgeName] = useState('');
+  const [vcLink, setVcLink] = useState('');
   const [filingDate, setFilingDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [nextDate, setNextDate] = useState('');
   const [stage, setStage] = useState('Filed');
@@ -81,6 +116,11 @@ export const AddCourtMatterModal: React.FC = () => {
   useEffect(() => {
     if (modalState.payload) {
       const ty: CourtType = modalState.payload;
+      setCustomNature('');
+      setCourtNo('');
+      setJudgeName('');
+      setVcLink('');
+
       if (ty === 'SC') {
         setCourt('Supreme Court of India');
         setBench('Division Bench');
@@ -99,6 +139,11 @@ export const AddCourtMatterModal: React.FC = () => {
         setCourt('NCDRC (National)');
         setNature('Consumer Complaint');
         setStage('Notice to OP');
+      } else if (ty === 'LC') {
+        setCourt('Central Govt Industrial Tribunal (CGIT)');
+        setBench('Presiding Officer');
+        setNature('Industrial Dispute / Termination');
+        setStage('Conciliation / Pleadings');
       } else if (ty === 'NGT') {
         setCourt('Principal Bench (Delhi)');
         setNature('Original Application');
@@ -136,6 +181,15 @@ export const AddCourtMatterModal: React.FC = () => {
       return;
     }
 
+    let finalNature = nature;
+    if (nature === 'Other') {
+      if (!customNature.trim()) {
+        showToast('Please specify the custom substantive nature', 'er');
+        return;
+      }
+      finalNature = customNature.trim();
+    }
+
     const client = clients.find((c) => c.id === clientId);
 
     addCourtMatter({
@@ -145,8 +199,11 @@ export const AddCourtMatterModal: React.FC = () => {
       caseNo: caseNo.trim(),
       caseTitle: caseTitle.trim(),
       court: court || CRT_NAMES[courtType],
+      courtNo: courtNo.trim() || undefined,
+      judgeName: judgeName.trim() || undefined,
+      vcLink: vcLink.trim() || undefined,
       bench: bench.trim(),
-      nature: nature.trim(),
+      nature: finalNature.trim(),
       filingDate,
       nextDate: nextDate || undefined,
       stage,
@@ -226,6 +283,12 @@ export const AddCourtMatterModal: React.FC = () => {
                     <option>NCDRC (National)</option>
                     <option>SCDRC (State)</option>
                     <option>DCDRC (District)</option>
+                  </select>
+                ) : courtType === 'LC' ? (
+                  <select value={court} onChange={(e) => setCourt(e.target.value)}>
+                    {LC_FORUMS.map((c) => (
+                      <option key={c}>{c}</option>
+                    ))}
                   </select>
                 ) : courtType === 'NGT' ? (
                   <select value={court} onChange={(e) => setCourt(e.target.value)}>
@@ -316,6 +379,7 @@ export const AddCourtMatterModal: React.FC = () => {
                   <option>Division Bench</option>
                   <option>Full Bench</option>
                   <option>Constitution Bench</option>
+                  <option>Presiding Officer</option>
                   <option>Sole Arbitrator</option>
                   <option>3-Member Tribunal</option>
                 </select>
@@ -335,6 +399,12 @@ export const AddCourtMatterModal: React.FC = () => {
                       <option key={n}>{n}</option>
                     ))}
                   </select>
+                ) : courtType === 'LC' ? (
+                  <select value={nature} onChange={(e) => setNature(e.target.value)}>
+                    {LC_NATURE.map((n) => (
+                      <option key={n}>{n}</option>
+                    ))}
+                  </select>
                 ) : (
                   <input
                     type="text"
@@ -343,6 +413,54 @@ export const AddCourtMatterModal: React.FC = () => {
                     placeholder="Nature of matter"
                   />
                 )}
+              </div>
+
+              {/* Custom Substantive Nature (when Other is selected) */}
+              {nature === 'Other' && (
+                <div className="fgp sp">
+                  <label className="fl">
+                    Custom Substantive Nature <span className="req">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Special Civil Application, Contempt Petition, Election Petition"
+                    value={customNature}
+                    onChange={(e) => setCustomNature(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {/* Court Number, Judge Name & VC Link */}
+              <div className="fgp">
+                <label className="fl">Court Number</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Court No. 14 / Room 204"
+                  value={courtNo}
+                  onChange={(e) => setCourtNo(e.target.value)}
+                />
+              </div>
+
+              <div className="fgp">
+                <label className="fl">Judge Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Hon'ble Justice D.Y. Chandrachud"
+                  value={judgeName}
+                  onChange={(e) => setJudgeName(e.target.value)}
+                />
+              </div>
+
+              <div className="fgp sp">
+                <label className="fl">Virtual link ( VC Link )</label>
+                <input
+                  type="url"
+                  placeholder="e.g. https://meet.google.com/xyz or Cisco Webex URL"
+                  value={vcLink}
+                  onChange={(e) => setVcLink(e.target.value)}
+                />
               </div>
 
               {/* Dates */}

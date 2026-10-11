@@ -68,7 +68,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
   };
 
   return (
-    <div className="ov op" onClick={(e) => e.target === e.currentTarget && handleClose()}>
+    <div className="ov op" style={{ zIndex: 1060 }} onClick={(e) => e.target === e.currentTarget && handleClose()}>
       <div className="mo sm">
         <div className="mh">
           <div className="flex items-center gap-2.5">

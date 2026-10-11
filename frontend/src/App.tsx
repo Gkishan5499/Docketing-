@@ -22,6 +22,7 @@ import { OwnerManagementPage } from './pages/OwnerManagementPage';
 import { AddMatterPage } from './pages/AddMatterPage';
 import { EditProfilePage } from './pages/EditProfilePage';
 import { AccountSettingsPage } from './pages/AccountSettingsPage';
+import { LegalNoticePage } from './pages/LegalNoticePage';
 
 function ApplicationRoutes() {
   const location = useLocation();
@@ -55,12 +56,18 @@ function ApplicationRoutes() {
           <Route path="hc" element={<CourtMatterPage type="HC" />} />
           <Route path="dc" element={<CourtMatterPage type="DC" />} />
           <Route path="cc" element={<CourtMatterPage type="CC" />} />
+          <Route path="lc" element={<CourtMatterPage type="LC" />} />
           <Route path="ngt" element={<CourtMatterPage type="NGT" />} />
           <Route path="nclt" element={<CourtMatterPage type="NCLT" />} />
           <Route path="itat" element={<CourtMatterPage type="ITAT" />} />
           <Route path="drt" element={<CourtMatterPage type="DRT" />} />
           <Route path="cat" element={<CourtMatterPage type="CAT" />} />
           <Route path="arb" element={<CourtMatterPage type="ARB" />} />
+
+        {/* Legal Notices Practice Area */}
+        <Route path="ln" element={<LegalNoticePage />} />
+        <Route path="ln/outward" element={<LegalNoticePage />} />
+        <Route path="ln/inward" element={<LegalNoticePage />} />
 
         {/* Practice Management Utilities */}
         <Route path="dkt" element={<DocketCalendarPage />} />

@@ -5,5 +5,5 @@ module.exports = createResourceController({
   Model: Matter,
   name: 'Matter',
   searchFields: ['mark', 'caseTitle', 'caseNo', 'appNo', 'clientName'],
-  fields: ['type', 'clientId', 'clientName', 'appNo', 'mark', 'classes', 'inventors', 'nature', 'designClass', 'goods', 'area', 'caseNo', 'caseTitle', 'court', 'bench', 'filingDate', 'nextDate', 'status', 'stage', 'priority', 'attorney', 'assignedAttorneyId', 'assignedStaffIds', 'notes', 'tags', 'statusHistory'],
+  fields: ['type', 'clientId', 'clientName', 'appNo', 'mark', 'classes', 'inventors', 'nature', 'designClass', 'goods', 'area', 'caseNo', 'caseTitle', 'court', 'courtNo', 'judgeName', 'vcLink', 'bench', 'filingDate', 'nextDate', 'status', 'stage', 'priority', 'attorney', 'assignedAttorneyId', 'assignedStaffIds', 'notes', 'tags', 'statusHistory'],
 });

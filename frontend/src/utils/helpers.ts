@@ -87,6 +87,8 @@ export const bTy = (t2: string) => {
     HC: 'bHC',
     DC: 'bDC',
     CC: 'bCC',
+    LC: 'bLC',
+    LN: 'bLN',
     NGT: 'bNGT',
     NCLT: 'bNCLT',
     ITAT: 'bITAT',

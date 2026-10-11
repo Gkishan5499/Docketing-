@@ -33,6 +33,7 @@ export const DashboardPage: React.FC = () => {
     deadlines,
     documents,
     activities,
+    legalNotices,
     openModal,
   } = useLawyersDiary();
 
@@ -101,7 +102,7 @@ export const DashboardPage: React.FC = () => {
       c: 'sl',
       v: courtMatters.length,
       l: 'Court & Tribunal Cases',
-      s: 'SC, HC, DC & 6 Tribunals',
+      s: 'SC, HC, DC, Labour & Tribunals',
       pct: totalEnrolled > 0 ? Math.round((courtMatters.length / totalEnrolled) * 100) : 0,
       trd: 'Litigation',
       Icon: Landmark,
@@ -149,6 +150,8 @@ export const DashboardPage: React.FC = () => {
     { k: 'HC', l: 'High Court', count: courtMatters.filter((r) => r.type === 'HC').length, path: '/hc' },
     { k: 'DC', l: 'District Ct.', count: courtMatters.filter((r) => r.type === 'DC').length, path: '/dc' },
     { k: 'CC', l: 'Consumer', count: courtMatters.filter((r) => r.type === 'CC').length, path: '/cc' },
+    { k: 'LC', l: 'Labour / Other', count: courtMatters.filter((r) => r.type === 'LC').length, path: '/lc' },
+    { k: 'LN', l: 'Legal Notices', count: legalNotices.length, path: '/ln' },
     { k: 'NGT', l: 'NGT', count: courtMatters.filter((r) => r.type === 'NGT').length, path: '/ngt' },
     { k: 'NCLT', l: 'NCLT/NCLAT', count: courtMatters.filter((r) => r.type === 'NCLT').length, path: '/nclt' },
     { k: 'ARB', l: 'Arbitration', count: courtMatters.filter((r) => r.type === 'ARB').length, path: '/arb' },

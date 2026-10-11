@@ -9,11 +9,13 @@ const controllers = {
   document: require('../controllers/document.controller'),
   note: require('../controllers/note.controller'),
   workLog: require('../controllers/workLog.controller'),
+  legalNotice: require('../controllers/legalNotice.controller'),
 };
 
 const matterFields = [
   'type', 'clientId', 'clientName', 'appNo', 'mark', 'classes', 'inventors',
   'nature', 'designClass', 'goods', 'area', 'caseNo', 'caseTitle', 'court',
+  'courtNo', 'judgeName', 'vcLink',
   'bench', 'filingDate', 'nextDate', 'status', 'stage', 'priority', 'attorney',
   'assignedAttorneyId', 'assignedStaffIds', 'notes', 'tags', 'statusHistory',
 ];
@@ -27,6 +29,7 @@ const definitions = [
   { path: '/tasks', controller: controllers.task },
   { path: '/notes', controller: controllers.note },
   { path: '/work-logs', controller: controllers.workLog },
+  { path: '/notices', controller: controllers.legalNotice },
 ];
 
 function registerResourceRoutes(router) {

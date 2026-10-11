@@ -13,6 +13,7 @@ import {
   ToastMessage,
   IprType,
   CourtType,
+  LegalNotice,
 } from '../types';
 import {
   initialClients,
@@ -25,6 +26,7 @@ import {
   initialAuditLogs,
   initialWorkLogs,
   initialNotes,
+  initialLegalNotices,
 } from '../data/seedData';
 import { gid, tsNow, dDiff } from '../utils/helpers';
 import {
@@ -48,7 +50,9 @@ interface ModalState {
     | 'log-time'
     | 'note'
     | 'create-folder'
-    | 'upload-doc';
+    | 'upload-doc'
+    | 'add-notice'
+    | 'notice-detail';
   payload?: any;
 }
 
@@ -83,6 +87,7 @@ interface LawyersDiaryContextType {
   auditLogs: AuditHistoryItem[];
   workLogs: WorkLogEntry[];
   notes: NoteItem[];
+  legalNotices: LegalNotice[];
 
   // Sync & Google Calendar
   syncStatus: 'synced' | 'syncing';
@@ -121,6 +126,7 @@ interface LawyersDiaryContextType {
   deleteDocketEvent: (id: string) => void;
 
   createVaultFolder: (name: string, parentPath?: string, color?: string) => VaultFolder | null;
+  ensureMatterFolders: (clientName: string, folderName: string) => { rootPath: string; subfolders: VaultFolder[] };
   deleteVaultFolder: (pathOrId: string) => void;
   uploadDocuments: (files: FileList | File[], targetFolder?: string, matterId?: string, tags?: string[]) => void;
   uploadDocumentItem: (doc: Omit<DocumentFile, 'id'>) => DocumentFile;
@@ -136,6 +142,10 @@ interface LawyersDiaryContextType {
   togglePinNote: (id: string) => void;
   deleteNote: (id: string) => void;
 
+  addLegalNotice: (notice: Omit<LegalNotice, 'id' | 'created'>) => void;
+  updateLegalNotice: (id: string, notice: Partial<LegalNotice>) => void;
+  deleteLegalNotice: (id: string) => void;
+
   // Badge Counts
   counts: {
     clients: number;
@@ -144,6 +154,10 @@ interface LawyersDiaryContextType {
     urgentHearings: number;
     upcomingHearings: number;
     pinnedNotes: number;
+    notices: number;
+    noticesSent: number;
+    noticesReceived: number;
+    noticesActionable: number;
     tm: number;
     pat: number;
     cp: number;
@@ -153,6 +167,7 @@ interface LawyersDiaryContextType {
     hc: number;
     dc: number;
     cc: number;
+    lc: number;
     ngt: number;
     nclt: number;
     itat: number;
@@ -259,6 +274,9 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [notes, setNotes] = useState<NoteItem[]>(() =>
     loadFromStorage('notes', initialNotes)
   );
+  const [legalNotices, setLegalNotices] = useState<LegalNotice[]>(() =>
+    loadFromStorage('legalNotices', initialLegalNotices)
+  );
 
   // Sync to localStorage
   useEffect(() => saveToStorage('isLoggedIn', isLoggedIn), [isLoggedIn]);
@@ -266,6 +284,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => saveToStorage('currentEmail', currentEmail), [currentEmail]);
   useEffect(() => saveToStorage('currentRole', currentRole), [currentRole]);
   useEffect(() => saveToStorage('mustChangePassword', mustChangePassword), [mustChangePassword]);
+  useEffect(() => saveToStorage('legalNotices', legalNotices), [legalNotices]);
   useEffect(() => saveToStorage('googleCalendarEmail', googleCalendarEmail), [googleCalendarEmail]);
   useEffect(() => saveToStorage('googleCalendarSync', googleCalendarSync), [googleCalendarSync]);
   useEffect(() => saveToStorage('googleCalendarScope', googleCalendarScope), [googleCalendarScope]);
@@ -810,6 +829,14 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setCourtMatters((prev) => [...prev, newMatter]);
 
       if (newMatter.nextDate) {
+        const venueParts = [newMatter.court];
+        if (newMatter.courtNo) venueParts.push(newMatter.courtNo);
+        const venueStr = venueParts.filter(Boolean).join(' · ');
+
+        let notesText = `Stage: ${newMatter.stage}`;
+        if (newMatter.judgeName) notesText += ` | Coram: ${newMatter.judgeName}`;
+        if (newMatter.vcLink) notesText += ` | VC: ${newMatter.vcLink}`;
+
         const newDeadline: DocketEvent = {
           id: gid('d'),
           type: 'Hearing',
@@ -817,10 +844,13 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
           matterName: newMatter.caseTitle,
           date: newMatter.nextDate,
           time: '10:30',
-          venue: newMatter.court,
+          venue: venueStr,
+          courtNo: newMatter.courtNo,
+          judgeName: newMatter.judgeName,
+          vcLink: newMatter.vcLink,
           priority: newMatter.priority === 'h' ? 'ug' : 'wa',
           attorney: newMatter.attorney,
-          notes: `Stage: ${newMatter.stage}`,
+          notes: notesText,
         };
         setDeadlines((prev) => [...prev, newDeadline]);
       }
@@ -919,6 +949,104 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return newFolder;
     },
     [audit, showToast, vaultFolders]
+  );
+
+  const ensureMatterFolders = useCallback(
+    (clientName: string, folderName: string): { rootPath: string; subfolders: VaultFolder[] } => {
+      const safeClient = (clientName || 'General_Client').trim().replace(/[\\/:*?"<>|]/g, '_');
+      const safeFolder = folderName.trim().replace(/[\\/:*?"<>|]/g, '_');
+      const clientPath = `/LawyersDiary/Clients/${safeClient}`;
+
+      let updatedFolders = [...vaultFolders];
+      let hasChanges = false;
+
+      // Ensure /LawyersDiary/Clients exists
+      if (!updatedFolders.some((f) => f.path.toLowerCase() === '/lawyersdiary/clients')) {
+        updatedFolders.push({
+          id: gid('vf'),
+          name: 'Clients',
+          path: '/LawyersDiary/Clients',
+          parentPath: '/LawyersDiary',
+          isSystem: true,
+          createdAt: new Date().toISOString().split('T')[0],
+        });
+        hasChanges = true;
+      }
+
+      // Ensure client folder exists
+      if (!updatedFolders.some((f) => f.path.toLowerCase() === clientPath.toLowerCase())) {
+        updatedFolders.push({
+          id: gid('vf'),
+          name: safeClient,
+          path: clientPath,
+          parentPath: '/LawyersDiary/Clients',
+          isSystem: false,
+          color: '#0284c7',
+          createdAt: new Date().toISOString().split('T')[0],
+        });
+        hasChanges = true;
+      }
+
+      // Find or create matter root folder
+      let existingRoot = updatedFolders.find(
+        (f) =>
+          f.path.toLowerCase() === `${clientPath}/${safeFolder}`.toLowerCase() ||
+          f.path.toLowerCase() === `/lawyersdiary/${safeFolder}`.toLowerCase() ||
+          f.name.toLowerCase() === safeFolder.toLowerCase()
+      );
+
+      const matterRootPath = existingRoot ? existingRoot.path : `${clientPath}/${safeFolder}`;
+
+      if (!existingRoot) {
+        existingRoot = {
+          id: gid('vf'),
+          name: safeFolder,
+          path: matterRootPath,
+          parentPath: clientPath,
+          color: '#38bdf8',
+          isSystem: false,
+          createdAt: new Date().toISOString().split('T')[0],
+        };
+        updatedFolders.push(existingRoot);
+        hasChanges = true;
+      }
+
+      // Default subfolders
+      const defaultSubs = [
+        'Pleadings',
+        'Orders_Judgments',
+        'Evidence_Exhibits',
+        'Written_Arguments',
+        'Client_Communication',
+      ];
+
+      defaultSubs.forEach((sub) => {
+        const subPath = `${matterRootPath}/${sub}`;
+        if (!updatedFolders.some((f) => f.path.toLowerCase() === subPath.toLowerCase())) {
+          updatedFolders.push({
+            id: gid('vf'),
+            name: sub,
+            path: subPath,
+            parentPath: matterRootPath,
+            color: '#22c55e',
+            isSystem: false,
+            createdAt: new Date().toISOString().split('T')[0],
+          });
+          hasChanges = true;
+        }
+      });
+
+      if (hasChanges) {
+        setVaultFolders(updatedFolders);
+      }
+
+      const subfolders = updatedFolders.filter(
+        (f) => f.path === matterRootPath || f.path.startsWith(matterRootPath + '/')
+      );
+
+      return { rootPath: matterRootPath, subfolders };
+    },
+    [vaultFolders]
   );
 
   const deleteVaultFolder = useCallback(
@@ -1171,6 +1299,96 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [audit, canDeleteRecords, showToast]
   );
 
+  // Legal Notices Actions
+  const addLegalNotice = useCallback(
+    (noticeData: Omit<LegalNotice, 'id' | 'created'>) => {
+      const newNotice: LegalNotice = {
+        ...noticeData,
+        id: gid('ln'),
+        created: new Date().toISOString().split('T')[0],
+        statusHistory: [
+          {
+            status: noticeData.status || 'Dispatched',
+            date: noticeData.noticeDate || new Date().toISOString().split('T')[0],
+            note: 'Legal notice recorded in system',
+          },
+        ],
+      };
+      setLegalNotices((prev) => [newNotice, ...prev]);
+
+      if (newNotice.replyDueDate) {
+        const newDeadline: DocketEvent = {
+          id: gid('d'),
+          type: 'Compliance',
+          matterId: newNotice.id,
+          matterName: `${newNotice.noticeNo} (${newNotice.clientName || 'Notice'})`,
+          date: newNotice.replyDueDate,
+          time: '17:00',
+          venue:
+            newNotice.direction === 'SENT'
+              ? 'Notice Cure Period Expiry / Actionable'
+              : 'Mandatory Reply Due Date',
+          priority: newNotice.priority === 'h' ? 'ug' : 'wa',
+          attorney: newNotice.attorney,
+          notes: `Subject: ${newNotice.subject} | Ref: ${newNotice.noticeNo}`,
+        };
+        setDeadlines((prev) => [...prev, newDeadline]);
+      }
+
+      setActivities((prev) => [
+        {
+          id: gid('a'),
+          text: `<strong>New Legal Notice:</strong> ${newNotice.noticeNo} (${newNotice.direction === 'SENT' ? 'Outward' : 'Inward'}) - ${newNotice.senderName} to ${newNotice.recipientName}`,
+          time: 'Just now',
+          color: newNotice.direction === 'SENT' ? 'pr' : 'wa',
+        },
+        ...prev,
+      ]);
+
+      audit('CREATE', 'Notice', `${newNotice.noticeNo}: ${newNotice.subject}`);
+      closeModal();
+      showToast(`Legal notice ${newNotice.noticeNo} saved!`, 'ok');
+    },
+    [audit, closeModal, showToast]
+  );
+
+  const updateLegalNotice = useCallback(
+    (id: string, updates: Partial<LegalNotice>) => {
+      setLegalNotices((prev) =>
+        prev.map((n) => {
+          if (n.id !== id) return n;
+          const updatedHistory = [...(n.statusHistory || [])];
+          if (updates.status && updates.status !== n.status) {
+            updatedHistory.push({
+              status: updates.status,
+              date: new Date().toISOString().split('T')[0],
+              note: updates.notes || `Status changed to ${updates.status}`,
+            });
+          }
+          return {
+            ...n,
+            ...updates,
+            statusHistory: updatedHistory,
+          };
+        })
+      );
+      audit('UPDATE', 'Notice', `Updated notice ${id}`);
+      showToast('Legal notice updated', 'ok');
+    },
+    [audit, showToast]
+  );
+
+  const deleteLegalNotice = useCallback(
+    (id: string) => {
+      if (!canDeleteRecords) return;
+      const target = legalNotices.find((x) => x.id === id);
+      setLegalNotices((prev) => prev.filter((n) => n.id !== id));
+      audit('DELETE', 'Notice', `Deleted notice ${target?.noticeNo || id}`);
+      showToast('Legal notice deleted', 'in');
+    },
+    [audit, canDeleteRecords, legalNotices, showToast]
+  );
+
   // Counts Calculation
   const counts = useMemo(() => {
     const urgent = deadlines.filter((d) => {
@@ -1190,6 +1408,10 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       urgentHearings: urgent,
       upcomingHearings: upcoming,
       pinnedNotes: notes.filter((n) => n.pinned).length,
+      notices: legalNotices.length,
+      noticesSent: legalNotices.filter((n) => n.direction === 'SENT').length,
+      noticesReceived: legalNotices.filter((n) => n.direction === 'RECEIVED').length,
+      noticesActionable: legalNotices.filter((n) => n.status === 'Dispatched' || n.status === 'Delivered / Served').length,
       tm: iprMatters.filter((m) => m.type === 'TM').length,
       pat: iprMatters.filter((m) => m.type === 'PAT').length,
       cp: iprMatters.filter((m) => m.type === 'COPY').length,
@@ -1199,6 +1421,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       hc: courtMatters.filter((r) => r.type === 'HC').length,
       dc: courtMatters.filter((r) => r.type === 'DC').length,
       cc: courtMatters.filter((r) => r.type === 'CC').length,
+      lc: courtMatters.filter((r) => r.type === 'LC').length,
       ngt: courtMatters.filter((r) => r.type === 'NGT').length,
       nclt: courtMatters.filter((r) => r.type === 'NCLT').length,
       itat: courtMatters.filter((r) => r.type === 'ITAT').length,
@@ -1206,7 +1429,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       cat: courtMatters.filter((r) => r.type === 'CAT').length,
       arb: courtMatters.filter((r) => r.type === 'ARB').length,
     };
-  }, [clients.length, courtMatters, deadlines, iprMatters, notes]);
+  }, [clients.length, courtMatters, deadlines, iprMatters, legalNotices, notes]);
 
   const value = useMemo(
     () => ({
@@ -1261,6 +1484,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       deleteDocketEvent,
       vaultFolders,
       createVaultFolder,
+      ensureMatterFolders,
       deleteVaultFolder,
       uploadDocuments,
       uploadDocumentItem,
@@ -1273,6 +1497,10 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       updateNote,
       togglePinNote,
       deleteNote,
+      legalNotices,
+      addLegalNotice,
+      updateLegalNotice,
+      deleteLegalNotice,
       counts,
     }),
     [
@@ -1301,6 +1529,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       auditLogs,
       workLogs,
       notes,
+      legalNotices,
       syncStatus,
       syncDriveAndCalendar,
       googleCalendarEmail,
@@ -1327,6 +1556,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       addDocketEvent,
       deleteDocketEvent,
       createVaultFolder,
+      ensureMatterFolders,
       deleteVaultFolder,
       uploadDocuments,
       uploadDocumentItem,
@@ -1339,6 +1569,9 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       updateNote,
       togglePinNote,
       deleteNote,
+      addLegalNotice,
+      updateLegalNotice,
+      deleteLegalNotice,
       counts,
     ]
   );

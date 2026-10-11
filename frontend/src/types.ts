@@ -5,6 +5,7 @@ export type CourtType =
   | 'HC'
   | 'DC'
   | 'CC'
+  | 'LC'
   | 'NGT'
   | 'NCLT'
   | 'ITAT'
@@ -66,6 +67,9 @@ export interface CourtMatter {
   caseNo: string;
   caseTitle: string;
   court: string;
+  courtNo?: string;
+  judgeName?: string;
+  vcLink?: string;
   bench?: string;
   nature?: string;
   filingDate: string;
@@ -86,6 +90,9 @@ export interface DocketEvent {
   date: string;
   time?: string;
   venue?: string;
+  courtNo?: string;
+  judgeName?: string;
+  vcLink?: string;
   priority: DocketPriority;
   attorney: string;
   notes?: string;
@@ -165,4 +172,87 @@ export interface ToastMessage {
   id: string;
   text: string;
   type: 'ok' | 'er' | 'in';
+}
+
+export type NoticeDirection = 'SENT' | 'RECEIVED';
+
+export type NoticeStatus =
+  | 'Draft'
+  | 'Dispatched'
+  | 'Delivered / Served'
+  | 'Reply Received'
+  | 'Replied'
+  | 'Settled / Complied'
+  | 'Escalated to Litigation'
+  | 'Expired / Actionable'
+  | 'Closed';
+
+export type NoticeCategory =
+  | 'Cheque Bounce (Sec 138 NI Act)'
+  | 'Demand Notice (Sec 8 IBC)'
+  | 'Eviction & Lease (Sec 106 TPA)'
+  | 'Government Notice (Sec 80 CPC)'
+  | 'Recovery of Dues / Money Demand'
+  | 'Breach of Contract & Damages'
+  | 'Consumer Deficiency & Refund'
+  | 'IPR Cease & Desist (TM / Copyright / Patent)'
+  | 'Employment & Salary / Non-Compete'
+  | 'Defamation & Apology'
+  | 'Arbitration Invocation (Sec 21)'
+  | 'Family & Matrimonial Dispute'
+  | 'Other Legal Notice';
+
+export type DispatchMode =
+  | 'Speed Post (India Post)'
+  | 'Registered Post AD (RPAD)'
+  | 'Courier (Blue Dart / DTDC)'
+  | 'Hand Delivery / Dasti'
+  | 'Email / Electronic'
+  | 'WhatsApp / Electronic';
+
+export interface LegalNotice {
+  id: string;
+  noticeNo: string;
+  direction: NoticeDirection;
+  category: NoticeCategory;
+  subject: string;
+  clientId?: string;
+  clientName: string;
+  senderName: string;
+  senderDesignation?: string;
+  senderAddress?: string;
+  senderPhone?: string;
+  senderEmail?: string;
+  senderAdvocate?: string;
+  senderAdvocateDetails?: string;
+  recipientName: string;
+  recipientDesignation?: string;
+  recipientAddress?: string;
+  recipientPhone?: string;
+  recipientEmail?: string;
+  recipientAdvocate?: string;
+  summary?: string;
+  claimAmount?: string;
+  demands?: string;
+  noticeDate: string;
+  dispatchDate?: string;
+  serviceDate?: string;
+  curePeriodDays?: number;
+  replyDueDate?: string;
+  dispatchMode?: DispatchMode;
+  trackingNo?: string;
+  postalStatus?: string;
+  trackingUrl?: string;
+  status: NoticeStatus;
+  priority: PriorityLevel;
+  attorney: string;
+  replyReceived?: boolean;
+  replyDate?: string;
+  replyRefNo?: string;
+  replySummary?: string;
+  connectedMatterId?: string;
+  connectedMatterTitle?: string;
+  notes?: string;
+  created: string;
+  statusHistory?: StatusHistoryItem[];
 }

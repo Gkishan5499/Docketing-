@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLawyersDiary } from '../context/LawyersDiaryContext';
-import { Award, Landmark, ArrowLeft } from 'lucide-react';
+import { Award, Landmark, ArrowLeft, MailCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CourtType, IprType } from '../types';
 
@@ -17,6 +17,7 @@ const courtTabs: Array<{ type: CourtType; label: string }> = [
   { type: 'HC', label: 'High Court' },
   { type: 'DC', label: 'District Court' },
   { type: 'CC', label: 'Consumer Forum' },
+  { type: 'LC', label: 'Other (Labour Court etc.)' },
   { type: 'NGT', label: 'NGT' },
   { type: 'NCLT', label: 'NCLT / NCLAT' },
   { type: 'ITAT', label: 'ITAT' },
@@ -66,6 +67,18 @@ export const AddMatterPage: React.FC = () => {
               <span>{type}</span>{label}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="add-matter-section">
+        <div className="add-matter-section-heading">
+          <MailCheck className="w-5 h-5" />
+          <h2>Legal Notices &amp; Statutory Demands</h2>
+        </div>
+        <div className="add-matter-tabs">
+          <button className="add-matter-tab" onClick={() => openModal('add-notice')}>
+            <span>LN</span>New Legal Notice Entry
+          </button>
         </div>
       </section>
     </div>
