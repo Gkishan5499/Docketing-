@@ -7,6 +7,8 @@ router.post('/register', controller.register);
 router.post('/login', controller.login);
 router.post('/refresh', controller.refresh);
 router.post('/logout', controller.logout);
+router.post('/setup-password', controller.setupPassword);
+router.get('/verify-setup-token', controller.verifySetupToken);
 router.get('/me', auth, (req, res) => ok(res, controller.publicUser(req.user), 'Current user fetched successfully'));
 router.post('/change-password', auth, controller.changePassword);
 module.exports = router;

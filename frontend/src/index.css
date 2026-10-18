@@ -2767,7 +2767,7 @@ select {
 }
 /* ── Premium Navbar ────────────────────────────── */
 .marketing-nav {
-  height: 84px;
+  height: 68px;
   padding: 0 5vw;
   display: flex;
   align-items: center;
@@ -2846,9 +2846,10 @@ select {
 }
 
 .marketing-nav-logo {
-  height: 48px;
+  height: 30px;
+  max-height: 32px;
   width: auto;
-  max-width: 250px;
+  max-width: 170px;
   object-fit: contain;
   display: block;
   transition: transform 0.2s ease, opacity 0.2s ease;
@@ -4262,7 +4263,8 @@ select {
   width: max-content;
 }
 .owner-table-row {
-  grid-template-columns: 1.7fr 1.1fr 0.8fr 0.8fr 1.1fr 150px !important;
+  grid-template-columns: 1.6fr 0.9fr 0.7fr 1fr 0.7fr 1fr 210px !important;
+  min-width: 860px;
 }
 .firm-status.suspended {
   color: #b91c1c;
@@ -4309,5 +4311,169 @@ select {
 .owner-row-btn.renew:hover {
   background: #dbeafe;
 }
+.owner-row-btn.paid {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+  font-weight: 800;
+}
+.owner-row-btn.paid:hover {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #059669;
+}
+.owner-fee-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.owner-fee-edit-btn {
+  background: none;
+  border: none;
+  color: #008cff;
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+  transition: color 0.15s;
+}
+.owner-fee-edit-btn:hover {
+  color: #0047d9;
+  background: #e6f3ff;
+}
+
+/* ==========================================================================
+   OWNER BILLING & FINANCE OVERVIEW HUB
+   ========================================================================== */
+.owner-billing-container {
+  display: grid;
+  gap: 1.8rem;
+  margin-top: 1.5rem;
+}
+.owner-billing-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 900px) {
+  .owner-billing-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.owner-kpi-card {
+  padding: 1.25rem 1.4rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  position: relative;
+  overflow: hidden;
+}
+.owner-kpi-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #008cff;
+}
+.owner-kpi-card.green::before { background: #10b981; }
+.owner-kpi-card.purple::before { background: #8b5cf6; }
+.owner-kpi-card.amber::before { background: #f59e0b; }
+
+.owner-kpi-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+.owner-kpi-value {
+  display: block;
+  font-family: var(--sans);
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: #071b49;
+  line-height: 1.1;
+  margin-bottom: 0.4rem;
+}
+.owner-kpi-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.owner-billing-table-row {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr 1fr 1.2fr 1.1fr 150px;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.8rem 0.6rem;
+  border-top: 1px solid #edf0ee;
+  color: #475569;
+  font-size: 0.78rem;
+  min-width: 820px;
+}
+.owner-billing-table-row.header {
+  border-top: none;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b979d;
+}
+
+.owner-payment-ledger-row {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr 1.1fr 1.2fr 0.9fr 1.3fr;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.8rem 0.6rem;
+  border-top: 1px solid #edf0ee;
+  color: #475569;
+  font-size: 0.78rem;
+  min-width: 880px;
+}
+.owner-payment-ledger-row.header {
+  border-top: none;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b979d;
+}
+
+.owner-method-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+.owner-method-pill.upi {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+.owner-method-pill.bank {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
 
 

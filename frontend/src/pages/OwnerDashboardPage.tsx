@@ -1,8 +1,13 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import {
   ArrowUpRight,
+  Calendar,
+  CheckCircle2,
   CreditCard,
+  DollarSign,
   KeyRound,
+  Mail,
+  Pencil,
   Plus,
   Search,
   UsersRound,
@@ -20,7 +25,10 @@ type Firm = {
   seatsTotal: number;
   status: "Active" | "Trial" | "Suspended";
   renewal: string;
+  rawRenewalDate?: string;
   monthlyValue: number;
+  lastPaymentDate?: string | null;
+  lastPaymentAmount?: number | null;
 };
 
 const initialFirms: Firm[] = [
@@ -34,7 +42,9 @@ const initialFirms: Firm[] = [
     seatsTotal: 5,
     status: "Active",
     renewal: "12 Sep 2026",
-    monthlyValue: 24980,
+    monthlyValue: 1599,
+    lastPaymentDate: "2026-08-12",
+    lastPaymentAmount: 1599,
   },
   {
     id: "rao-ip-chambers",
@@ -46,7 +56,9 @@ const initialFirms: Firm[] = [
     seatsTotal: 1,
     status: "Active",
     renewal: "28 Sep 2026",
-    monthlyValue: 9990,
+    monthlyValue: 759,
+    lastPaymentDate: "2026-08-28",
+    lastPaymentAmount: 759,
   },
   {
     id: "northstar-legal",
@@ -59,6 +71,8 @@ const initialFirms: Firm[] = [
     status: "Trial",
     renewal: "Trial ends 24 Aug",
     monthlyValue: 0,
+    lastPaymentDate: null,
+    lastPaymentAmount: null,
   },
 ];
 
@@ -66,12 +80,14 @@ const planSeats: Record<string, number> = {
   "Solo Counsel": 1,
   Chambers: 5,
   "Firm Office": 15,
+  Custom: 20,
 };
 
 const planValue: Record<string, number> = {
-  "Solo Counsel": 7590,
-  Chambers: 15990,
-  "Firm Office": 29990,
+  "Solo Counsel": 759,
+  Chambers: 1599,
+  "Firm Office": 2999,
+  Custom: 4999,
 };
 
 const readFirms = (): Firm[] => {
@@ -95,20 +111,61 @@ export const OwnerDashboardPage: React.FC = () => {
     owner: string;
     email: string;
     temporaryPassword: string;
+    setupPasswordToken?: string;
+    emailDelivery?: {
+      sent: boolean;
+      configured?: boolean;
+      reason?: string;
+      message?: string;
+    };
   } | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  // New firm form state (includes custom agreed monthly fee and seats)
   const [newFirm, setNewFirm] = useState({
     name: "",
     owner: "",
     email: "",
     plan: "Solo Counsel",
+    seatsTotal: 1,
+    monthlyValue: 759,
   });
   const [formError, setFormError] = useState("");
+
+  // Lawyer access provisioning modal state
   const [selectedFirmForTeam, setSelectedFirmForTeam] = useState<Firm | null>(null);
   const [firmLawyers, setFirmLawyers] = useState<{ id: string; name: string; email: string; role: string; status: string }[]>([]);
   const [loadingLawyers, setLoadingLawyers] = useState(false);
   const [newLawyerForm, setNewLawyerForm] = useState({ name: "", email: "", role: "ATTORNEY" });
   const [lawyerFormError, setLawyerFormError] = useState("");
   const [provisionedCreds, setProvisionedCreds] = useState<{ name: string; email: string; temporaryPassword: string } | null>(null);
+
+  // Manual payment recording modal state
+  const [recordingPaymentFirm, setRecordingPaymentFirm] = useState<Firm | null>(null);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: 0,
+    paymentDate: new Date().toISOString().split("T")[0],
+    paymentMethod: "UPI",
+    referenceNumber: "",
+    periodMonths: 1,
+    notes: "",
+  });
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [paymentSuccessMsg, setPaymentSuccessMsg] = useState("");
+
+  // Edit monthly fee & plan modal state
+  const [editingPricingFirm, setEditingPricingFirm] = useState<Firm | null>(null);
+  const [pricingForm, setPricingForm] = useState({
+    plan: "Solo Counsel",
+    monthlyValue: 0,
+    seatsTotal: 1,
+    status: "Active" as "Active" | "Trial" | "Suspended",
+    renewalDate: "",
+  });
+  const [pricingSubmitting, setPricingSubmitting] = useState(false);
+  const [pricingError, setPricingError] = useState("");
+
   const visibleFirms = firmList.filter((firm) =>
     `${firm.name} ${firm.owner} ${firm.plan}`
       .toLowerCase()
@@ -121,7 +178,7 @@ export const OwnerDashboardPage: React.FC = () => {
   const provisionedSeats = firmList.reduce((total, firm) => total + firm.seatsTotal, 0);
   const monthlyRecurring = firmList
     .filter((firm) => firm.status === "Active")
-    .reduce((total, firm) => total + firm.monthlyValue, 0);
+    .reduce((total, firm) => total + (firm.monthlyValue || 0), 0);
   const renewalsThisWeek = firmList.filter((firm) => {
     const date = new Date(firm.renewal);
     if (Number.isNaN(date.getTime())) return false;
@@ -175,6 +232,15 @@ export const OwnerDashboardPage: React.FC = () => {
     navigate("/owner/login");
   };
 
+  const onPlanSelectChange = (selectedPlan: string) => {
+    setNewFirm((prev) => ({
+      ...prev,
+      plan: selectedPlan,
+      seatsTotal: planSeats[selectedPlan] || prev.seatsTotal,
+      monthlyValue: planValue[selectedPlan] || prev.monthlyValue,
+    }));
+  };
+
   const submitFirm = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const name = newFirm.name.trim();
@@ -188,14 +254,21 @@ export const OwnerDashboardPage: React.FC = () => {
       setFormError("A firm with this owner email already exists.");
       return;
     }
-    const seatsTotal = planSeats[newFirm.plan];
+
     const createFirm = async () => {
       try {
         const response = await fetch("/api/v1/owner/firms", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ name, owner, email, plan: newFirm.plan }),
+          body: JSON.stringify({
+            name,
+            owner,
+            email,
+            plan: newFirm.plan,
+            seatsTotal: Number(newFirm.seatsTotal) || planSeats[newFirm.plan] || 1,
+            monthlyValue: Number(newFirm.monthlyValue) || planValue[newFirm.plan] || 0,
+          }),
         });
         const result = await response.json();
         if (response.status === 401) {
@@ -205,7 +278,14 @@ export const OwnerDashboardPage: React.FC = () => {
         }
         if (!response.ok) throw new Error(result.message || "Unable to create firm.");
         setFirmList((current) => [result.data.firm, ...current]);
-        setNewFirm({ name: "", owner: "", email: "", plan: "Solo Counsel" });
+        setNewFirm({
+          name: "",
+          owner: "",
+          email: "",
+          plan: "Solo Counsel",
+          seatsTotal: 1,
+          monthlyValue: 7590,
+        });
         setFormError("");
         setApiError("");
         setCredentials({
@@ -213,6 +293,8 @@ export const OwnerDashboardPage: React.FC = () => {
           owner: result.data.firm.owner,
           email: result.data.firm.email,
           temporaryPassword: result.data.temporaryPassword,
+          setupPasswordToken: result.data.setupPasswordToken,
+          emailDelivery: result.data.emailDelivery,
         });
         setShowNewFirm(false);
       } catch (error) {
@@ -220,6 +302,32 @@ export const OwnerDashboardPage: React.FC = () => {
       }
     };
     createFirm();
+  };
+
+  const resendFirmInvite = async (firm: Firm) => {
+    setResendingId(firm.id);
+    try {
+      const response = await fetch(`/api/v1/owner/firms/${firm.id}/resend-invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Failed to resend credentials");
+
+      setCredentials({
+        firmName: firm.name,
+        owner: firm.owner,
+        email: firm.email,
+        temporaryPassword: result.data.temporaryPassword,
+        setupPasswordToken: result.data.setupPasswordToken,
+        emailDelivery: result.data.emailDelivery,
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to dispatch email");
+    } finally {
+      setResendingId(null);
+    }
   };
 
   const toggleFirmStatus = async (firm: Firm) => {
@@ -245,45 +353,104 @@ export const OwnerDashboardPage: React.FC = () => {
     );
   };
 
-  const renewMonthly = async (firm: Firm) => {
-    const d = new Date();
-    d.setDate(d.getDate() + 30);
-    const renewalFormatted = d.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+  const openRecordPaymentModal = (firm: Firm) => {
+    setRecordingPaymentFirm(firm);
+    setPaymentError("");
+    setPaymentSuccessMsg("");
+    setPaymentForm({
+      amount: firm.monthlyValue || planValue[firm.plan] || 0,
+      paymentDate: new Date().toISOString().split("T")[0],
+      paymentMethod: "UPI",
+      referenceNumber: "",
+      periodMonths: 1,
+      notes: "",
     });
+  };
+
+  const submitRecordPayment = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!recordingPaymentFirm) return;
+    setPaymentSubmitting(true);
+    setPaymentError("");
 
     try {
-      const response = await fetch(`/api/v1/owner/firms/${firm.id}`, {
+      const response = await fetch(`/api/v1/owner/firms/${recordingPaymentFirm.id}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(paymentForm),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Failed to record payment");
+
+      if (result.data?.firm) {
+        setFirmList((current) =>
+          current.map((f) => (f.id === recordingPaymentFirm.id ? result.data.firm : f))
+        );
+      }
+      setPaymentSuccessMsg("Payment recorded! Subscription renewal date extended successfully.");
+      setTimeout(() => {
+        setRecordingPaymentFirm(null);
+        setPaymentSuccessMsg("");
+      }, 1200);
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : "Failed to record payment");
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  };
+
+  const openEditPricingModal = (firm: Firm) => {
+    setEditingPricingFirm(firm);
+    setPricingError("");
+    const parsedDate = firm.rawRenewalDate
+      ? new Date(firm.rawRenewalDate).toISOString().split("T")[0]
+      : "";
+    setPricingForm({
+      plan: firm.plan,
+      monthlyValue: firm.monthlyValue ?? planValue[firm.plan] ?? 0,
+      seatsTotal: firm.seatsTotal ?? planSeats[firm.plan] ?? 1,
+      status: firm.status,
+      renewalDate: parsedDate,
+    });
+  };
+
+  const submitUpdatePricing = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingPricingFirm) return;
+    setPricingSubmitting(true);
+    setPricingError("");
+
+    try {
+      const response = await fetch(`/api/v1/owner/firms/${editingPricingFirm.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ renewMonthly: true }),
+        body: JSON.stringify({
+          plan: pricingForm.plan,
+          monthlyValue: Number(pricingForm.monthlyValue),
+          seatsTotal: Number(pricingForm.seatsTotal),
+          status: pricingForm.status,
+          renewalDate: pricingForm.renewalDate || undefined,
+        }),
       });
-      if (response.ok) {
-        const res = await response.json();
-        if (res.data?.renewal) {
-          setFirmList((current) =>
-            current.map((item) =>
-              item.id === firm.id
-                ? { ...item, status: "Active", renewal: res.data.renewal }
-                : item
-            )
-          );
-          return;
-        }
-      }
-    } catch {
-      // Local fallback for offline simulation
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Failed to update firm pricing");
+
+      const updatedFirm = result.data;
+      setFirmList((current) =>
+        current.map((f) => (f.id === editingPricingFirm.id ? updatedFirm : f))
+      );
+      setEditingPricingFirm(null);
+    } catch (err) {
+      setPricingError(err instanceof Error ? err.message : "Failed to update firm pricing");
+    } finally {
+      setPricingSubmitting(false);
     }
-    setFirmList((current) =>
-      current.map((item) =>
-        item.id === firm.id
-          ? { ...item, status: "Active", renewal: renewalFormatted }
-          : item
-      )
-    );
+  };
+
+  const renewMonthly = async (firm: Firm) => {
+    openRecordPaymentModal(firm);
   };
 
   const openFirmTeam = async (firm: Firm) => {
@@ -441,6 +608,7 @@ export const OwnerDashboardPage: React.FC = () => {
                 <span>Firm</span>
                 <span>Plan</span>
                 <span>Seats</span>
+                <span>Monthly Fee</span>
                 <span>Status</span>
                 <span>Renewal</span>
                 <span>Actions</span>
@@ -459,11 +627,50 @@ export const OwnerDashboardPage: React.FC = () => {
                   <span className="owner-seats-pill">
                     {firm.seatsUsed} / {firm.seatsTotal}
                   </span>
+                  <div className="owner-fee-badge">
+                    <span>₹{(firm.monthlyValue || 0).toLocaleString("en-IN")}/mo</span>
+                    <button
+                      type="button"
+                      className="owner-fee-edit-btn"
+                      onClick={() => openEditPricingModal(firm)}
+                      title="Edit agreed monthly subscription rate"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  </div>
                   <span className={`firm-status ${firm.status.toLowerCase()}`}>
                     {firm.status}
                   </span>
-                  <span>{firm.renewal}</span>
+                  <div>
+                    <span>{firm.renewal}</span>
+                    {firm.lastPaymentAmount ? (
+                      <small style={{ color: "#16a34a", fontSize: "0.68rem", display: "block" }}>
+                        Paid ₹{firm.lastPaymentAmount.toLocaleString("en-IN")}
+                      </small>
+                    ) : null}
+                  </div>
                   <div className="owner-row-actions">
+                    <button
+                      type="button"
+                      className="owner-row-btn paid"
+                      onClick={() => openRecordPaymentModal(firm)}
+                      title="Record offline payment received after connection/enquiry (+auto renew)"
+                      style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}
+                    >
+                      <DollarSign size={11} />
+                      <span>Paid</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="owner-row-btn"
+                      onClick={() => resendFirmInvite(firm)}
+                      disabled={resendingId === firm.id}
+                      title="Resend welcome email with temporary password & setup link via Gmail SMTP"
+                      style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
+                    >
+                      <Mail size={12} />
+                      <span>{resendingId === firm.id ? "Sending..." : "Invite"}</span>
+                    </button>
                     <button
                       type="button"
                       className={`owner-row-btn ${firm.status === "Suspended" ? "activate" : "suspend"}`}
@@ -471,14 +678,6 @@ export const OwnerDashboardPage: React.FC = () => {
                       title={firm.status === "Suspended" ? "Reactivate firm subscription" : "Suspend firm access"}
                     >
                       {firm.status === "Suspended" ? "Activate" : "Suspend"}
-                    </button>
-                    <button
-                      type="button"
-                      className="owner-row-btn renew"
-                      onClick={() => renewMonthly(firm)}
-                      title="Record monthly renewal payment (+30 days)"
-                    >
-                      +30d
                     </button>
                     <button
                       className="owner-more"
@@ -537,6 +736,7 @@ export const OwnerDashboardPage: React.FC = () => {
             aria-modal="true"
             onSubmit={submitFirm}
             onClick={(event) => event.stopPropagation()}
+            style={{ maxWidth: "480px" }}
           >
             <span className="owner-kicker">New customer</span>
             <h2>Add a subscribed firm</h2>
@@ -550,6 +750,7 @@ export const OwnerDashboardPage: React.FC = () => {
                 value={newFirm.name}
                 onChange={(event) => setNewFirm({ ...newFirm, name: event.target.value })}
                 placeholder="e.g. Mehta & Partners"
+                required
               />
             </label>
             <label>
@@ -559,6 +760,7 @@ export const OwnerDashboardPage: React.FC = () => {
                 value={newFirm.email}
                 onChange={(event) => setNewFirm({ ...newFirm, email: event.target.value })}
                 placeholder="owner@firm.com"
+                required
               />
             </label>
             <label>
@@ -567,19 +769,47 @@ export const OwnerDashboardPage: React.FC = () => {
                 value={newFirm.owner}
                 onChange={(event) => setNewFirm({ ...newFirm, owner: event.target.value })}
                 placeholder="e.g. Ananya Mehta"
+                required
               />
             </label>
             <label>
               Plan
               <select
                 value={newFirm.plan}
-                onChange={(event) => setNewFirm({ ...newFirm, plan: event.target.value })}
+                onChange={(event) => onPlanSelectChange(event.target.value)}
               >
-                <option>Solo Counsel</option>
-                <option>Chambers</option>
-                <option>Firm Office</option>
+                <option value="Solo Counsel">Solo Counsel (1 seat)</option>
+                <option value="Chambers">Chambers (5 seats)</option>
+                <option value="Firm Office">Firm Office (15 seats)</option>
+                <option value="Custom">Custom Enterprise Plan</option>
               </select>
             </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <label>
+                Monthly Fee (₹)
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={newFirm.monthlyValue}
+                  onChange={(event) => setNewFirm({ ...newFirm, monthlyValue: Number(event.target.value) })}
+                  placeholder="759"
+                  required
+                />
+              </label>
+              <label>
+                Provisioned Seats
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={newFirm.seatsTotal}
+                  onChange={(event) => setNewFirm({ ...newFirm, seatsTotal: Number(event.target.value) })}
+                  placeholder="1"
+                  required
+                />
+              </label>
+            </div>
             {formError && <p className="owner-login-error">{formError}</p>}
             <button
               className="button button-primary"
@@ -587,6 +817,262 @@ export const OwnerDashboardPage: React.FC = () => {
             >
               Save firm and continue <ArrowUpRight size={16} />
             </button>
+          </form>
+        </div>
+      )}
+
+      {/* Record Manual Payment Modal */}
+      {recordingPaymentFirm && (
+        <div
+          className="owner-modal-backdrop"
+          role="presentation"
+          onClick={() => setRecordingPaymentFirm(null)}
+        >
+          <form
+            className="owner-modal"
+            role="dialog"
+            aria-modal="true"
+            onSubmit={submitRecordPayment}
+            onClick={(event) => event.stopPropagation()}
+            style={{ maxWidth: "520px" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <span className="owner-kicker">Manual Payment Inflow</span>
+                <h2>Record Payment</h2>
+                <p style={{ margin: "0.25rem 0 0" }}>
+                  Firm: <strong>{recordingPaymentFirm.name}</strong> ({recordingPaymentFirm.plan})
+                </p>
+              </div>
+              <button
+                type="button"
+                className="owner-more"
+                onClick={() => setRecordingPaymentFirm(null)}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "10px 12px", borderRadius: "6px", fontSize: "0.78rem", color: "#475569" }}>
+              <div>Agreed Monthly Rate: <strong>₹{(recordingPaymentFirm.monthlyValue || 0).toLocaleString("en-IN")}/mo</strong></div>
+              <div>Current Renewal Date: <strong>{recordingPaymentFirm.renewal}</strong></div>
+            </div>
+
+            {paymentSuccessMsg && (
+              <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "10px 14px", borderRadius: "6px", fontSize: "0.82rem", color: "#065f46" }}>
+                ✓ {paymentSuccessMsg}
+              </div>
+            )}
+            {paymentError && <p className="owner-login-error">{paymentError}</p>}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <label>
+                Amount Paid (₹)
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  value={paymentForm.amount}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, amount: Number(e.target.value) })}
+                />
+              </label>
+              <label>
+                Renewal Period
+                <select
+                  value={paymentForm.periodMonths}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, periodMonths: Number(e.target.value) })}
+                >
+                  <option value={1}>1 Month (+30 Days)</option>
+                  <option value={3}>3 Months (+90 Days - Quarter)</option>
+                  <option value={6}>6 Months (+180 Days)</option>
+                  <option value={12}>12 Months (+365 Days - Annual)</option>
+                </select>
+              </label>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <label>
+                Payment Method
+                <select
+                  value={paymentForm.paymentMethod}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
+                >
+                  <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
+                  <option value="Bank Transfer">Bank Transfer (NEFT / IMPS / RTGS)</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label>
+                Payment Date
+                <input
+                  type="date"
+                  required
+                  value={paymentForm.paymentDate}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                />
+              </label>
+            </div>
+
+            <label>
+              Transaction Ref / UTR
+              <input
+                placeholder="e.g. UPI Ref / UTR / Cheque No."
+                value={paymentForm.referenceNumber}
+                onChange={(e) => setPaymentForm({ ...paymentForm, referenceNumber: e.target.value })}
+              />
+            </label>
+
+            <label>
+              Enquiry / Payment Notes
+              <input
+                placeholder="e.g. Paid after enquiry call; WhatsApp confirmation"
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+              />
+            </label>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                className="owner-secondary-button"
+                onClick={() => setRecordingPaymentFirm(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="button button-primary"
+                disabled={paymentSubmitting}
+              >
+                {paymentSubmitting ? "Recording..." : "Record Payment & Advance Renewal"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Edit Pricing & Subscription Modal */}
+      {editingPricingFirm && (
+        <div
+          className="owner-modal-backdrop"
+          role="presentation"
+          onClick={() => setEditingPricingFirm(null)}
+        >
+          <form
+            className="owner-modal"
+            role="dialog"
+            aria-modal="true"
+            onSubmit={submitUpdatePricing}
+            onClick={(event) => event.stopPropagation()}
+            style={{ maxWidth: "480px" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <span className="owner-kicker">Subscription & Pricing</span>
+                <h2>Edit Monthly Fee</h2>
+                <p style={{ margin: "0.25rem 0 0" }}>
+                  Firm: <strong>{editingPricingFirm.name}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                className="owner-more"
+                onClick={() => setEditingPricingFirm(null)}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {pricingError && <p className="owner-login-error">{pricingError}</p>}
+
+            <label>
+              Plan
+              <select
+                value={pricingForm.plan}
+                onChange={(e) => {
+                  const p = e.target.value;
+                  setPricingForm({
+                    ...pricingForm,
+                    plan: p,
+                    monthlyValue: planValue[p] !== undefined ? planValue[p] : pricingForm.monthlyValue,
+                    seatsTotal: planSeats[p] !== undefined ? planSeats[p] : pricingForm.seatsTotal,
+                  });
+                }}
+              >
+                <option value="Solo Counsel">Solo Counsel</option>
+                <option value="Chambers">Chambers</option>
+                <option value="Firm Office">Firm Office</option>
+                <option value="Custom">Custom Enterprise</option>
+              </select>
+            </label>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <label>
+                Monthly Rate (₹)
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="1"
+                  value={pricingForm.monthlyValue}
+                  onChange={(e) => setPricingForm({ ...pricingForm, monthlyValue: Number(e.target.value) })}
+                />
+              </label>
+              <label>
+                Allocated Seats
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  max="100"
+                  value={pricingForm.seatsTotal}
+                  onChange={(e) => setPricingForm({ ...pricingForm, seatsTotal: Number(e.target.value) })}
+                />
+              </label>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <label>
+                Subscription Status
+                <select
+                  value={pricingForm.status}
+                  onChange={(e) => setPricingForm({ ...pricingForm, status: e.target.value as any })}
+                >
+                  <option value="Active">Active</option>
+                  <option value="Trial">Trial</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+              </label>
+              <label>
+                Renewal Date
+                <input
+                  type="date"
+                  value={pricingForm.renewalDate}
+                  onChange={(e) => setPricingForm({ ...pricingForm, renewalDate: e.target.value })}
+                />
+              </label>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                className="owner-secondary-button"
+                onClick={() => setEditingPricingFirm(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="button button-primary"
+                disabled={pricingSubmitting}
+              >
+                {pricingSubmitting ? "Saving..." : "Save Pricing & Subscription"}
+              </button>
+            </div>
           </form>
         </div>
       )}
@@ -603,11 +1089,31 @@ export const OwnerDashboardPage: React.FC = () => {
             aria-labelledby="credentials-title"
             onClick={(event) => event.stopPropagation()}
           >
-            <span className="owner-kicker">Share securely</span>
-            <h2 id="credentials-title">Owner login created</h2>
+            <span className="owner-kicker">Subscription Provisioned</span>
+            <h2 id="credentials-title">Firm Owner Access Created</h2>
             <p>
-              These credentials are shown once. Share them privately and ask the owner to change the password after signing in.
+              Credentials and automated password creation link generated for the subscribed firm.
             </p>
+
+            {/* Gmail SMTP delivery status */}
+            {credentials.emailDelivery?.sent ? (
+              <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "10px 14px", borderRadius: "8px", margin: "12px 0", fontSize: "0.82rem", color: "#065f46", display: "flex", alignItems: "center", gap: "8px" }}>
+                <CheckCircle2 size={18} style={{ color: "#059669", flexShrink: 0 }} />
+                <span>
+                  <strong>Email Sent via Gmail SMTP:</strong> Welcome email with temporary password &amp; setup link dispatched to <strong>{credentials.email}</strong>.
+                </span>
+              </div>
+            ) : (
+              <div style={{ background: "#fffbeb", border: "1px solid #fde68a", padding: "10px 14px", borderRadius: "8px", margin: "12px 0", fontSize: "0.82rem", color: "#92400e", display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                <Mail size={18} style={{ color: "#d97706", flexShrink: 0, marginTop: "2px" }} />
+                <div>
+                  <strong>Email Delivery:</strong> {credentials.emailDelivery?.message || "Gmail SMTP App Password not configured in backend/.env"}.
+                  <br />
+                  <span style={{ color: "#78350f" }}>Please share the credentials or the direct setup link below with the firm owner.</span>
+                </div>
+              </div>
+            )}
+
             <div className="owner-credential-box">
               <span>Firm</span>
               <strong>{credentials.firmName}</strong>
@@ -617,19 +1123,44 @@ export const OwnerDashboardPage: React.FC = () => {
               <strong>{credentials.email}</strong>
               <span>Temporary password</span>
               <strong className="owner-temporary-password">{credentials.temporaryPassword}</strong>
+              {credentials.setupPasswordToken && (
+                <>
+                  <span>Password Setup Link</span>
+                  <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "#1d4ed8", background: "#eff6ff", padding: "8px", borderRadius: "6px", border: "1px solid #bfdbfe", wordBreak: "break-all", userSelect: "all" }}>
+                    {`${window.location.origin}/set-password?token=${credentials.setupPasswordToken}&email=${encodeURIComponent(credentials.email)}`}
+                  </div>
+                </>
+              )}
             </div>
-            <div className="owner-credential-actions">
+            <div className="owner-credential-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
               <button
                 className="button button-primary"
                 type="button"
                 onClick={() => {
+                  const setupUrl = credentials.setupPasswordToken
+                    ? `${window.location.origin}/set-password?token=${credentials.setupPasswordToken}&email=${encodeURIComponent(credentials.email)}`
+                    : `${window.location.origin}/login?email=${encodeURIComponent(credentials.email)}`;
                   navigator.clipboard.writeText(
-                    `DexFora login\nFirm: ${credentials.firmName}\nEmail: ${credentials.email}\nTemporary password: ${credentials.temporaryPassword}`,
+                    `DexFora Practice Management Access\nFirm: ${credentials.firmName}\nEmail: ${credentials.email}\nTemporary password: ${credentials.temporaryPassword}\nCreate your permanent password: ${setupUrl}`,
                   );
+                  alert("Credentials and setup link copied to clipboard!");
                 }}
               >
-                Copy credentials
+                Copy credentials &amp; link
               </button>
+              {credentials.setupPasswordToken && (
+                <button
+                  className="owner-secondary-button"
+                  type="button"
+                  onClick={() => {
+                    const setupUrl = `${window.location.origin}/set-password?token=${credentials.setupPasswordToken}&email=${encodeURIComponent(credentials.email)}`;
+                    navigator.clipboard.writeText(setupUrl);
+                    alert("Password setup link copied to clipboard!");
+                  }}
+                >
+                  Copy Link Only
+                </button>
+              )}
               <button className="owner-secondary-button" type="button" onClick={() => setCredentials(null)}>
                 Done
               </button>

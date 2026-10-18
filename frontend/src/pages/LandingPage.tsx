@@ -7,14 +7,13 @@ import {
   ChevronDown,
   FileText,
   LockKeyhole,
-  Menu,
   Scale,
   Search,
   ShieldCheck,
   UsersRound,
-  X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { LandingHeader } from '../components/landing/LandingHeader';
 
 const plans = [
   {
@@ -49,38 +48,59 @@ const faqs = [
 
 export const LandingPage: React.FC = () => {
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    firm: '',
+    email: '',
+    phone: '',
+    plan: '',
+    message: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [sent, setSent] = useState(false);
 
   const selectPlan = (plan: string) => {
-    setSelectedPlan(plan);
+    setFormData((prev) => ({ ...prev, plan }));
     document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
-    setMobileOpen(false);
   };
 
-  const submitContact = (event: FormEvent<HTMLFormElement>) => {
+  const submitContact = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSent(true);
+    setSubmitError('');
+
+    if (formData.phone && formData.phone.length !== 10) {
+      setSubmitError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const payload = {
+        ...formData,
+        phone: formData.phone ? `+91 ${formData.phone}` : '',
+      };
+      const response = await fetch('/api/v1/enquiry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to submit enquiry. Please try again.');
+      }
+      setSent(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Unable to dispatch enquiry email.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="marketing-page">
-      <header className="marketing-nav">
-        <a className="marketing-brand" href="#top" aria-label="DexFora home">
-          <img src="/logo.png" alt="DexFora" className="marketing-nav-logo" />
-        </a>
-        <button className="marketing-menu" type="button" onClick={() => setMobileOpen((open) => !open)} aria-label="Toggle navigation">
-          {mobileOpen ? <X size={21} /> : <Menu size={21} />}
-        </button>
-        <nav className={`marketing-links ${mobileOpen ? 'is-open' : ''}`}>
-          <a href="#product" onClick={() => setMobileOpen(false)}>Platform</a>
-          <a href="#plans" onClick={() => setMobileOpen(false)}>Plans</a>
-          <a href="#security" onClick={() => setMobileOpen(false)}>Security</a>
-          <a href="#contact" onClick={() => setMobileOpen(false)}>Contact</a>
-          <Link className="marketing-login" to="/login" onClick={() => setMobileOpen(false)}>Login <ArrowRight size={15} /></Link>
-        </nav>
-      </header>
+      <LandingHeader />
 
       <main id="top">
         <section className="marketing-hero">
@@ -116,7 +136,164 @@ export const LandingPage: React.FC = () => {
 
         <section className="faq-section"><div><p className="eyebrow"><span /> Before you begin</p><h2>A better way to<br /><em>run the day.</em></h2></div><div className="faq-list">{faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={17} /></summary><p>{answer}</p></details>)}</div></section>
 
-        <section className="contact-section" id="contact"><div className="contact-copy"><p className="eyebrow"><span /> Start a conversation</p><h2>Let’s put your<br /><em>practice in order.</em></h2><p>Tell us a little about your chambers or firm. We will recommend a plan, set up your workspace, and share login details for every purchased seat.</p><div className="contact-details"><span><strong>Enquiry</strong> <a href="tel:8447014799">+91 84470 14799</a></span><span><strong>Email</strong> <a href="mailto:dexforaofficial@gmail.com">dexforaofficial@gmail.com</a></span><span><strong>Hours</strong> Monday–Saturday · 09:30–19:30 IST</span></div></div>{sent ? <div className="contact-success"><BadgeCheck size={36} /><h3>Thank you. We have your note.</h3><p>Our team will contact you shortly about your DexFora workspace, or you can reach us directly at +91 84470 14799.</p><button className="text-link" type="button" onClick={() => setSent(false)}>Send another enquiry <ArrowRight size={15} /></button></div> : <form className="contact-form" onSubmit={submitContact}><div className="form-row"><label>Name<input required name="name" placeholder="Your name" /></label><label>Firm / chambers<input required name="firm" placeholder="Firm name" /></label></div><label>Work email<input required type="email" name="email" placeholder="you@yourfirm.com" /></label><label>What are you looking for?<select name="plan" value={selectedPlan} onChange={(event) => setSelectedPlan(event.target.value)}><option value="">Select a plan</option>{plans.map((plan) => <option key={plan.name} value={plan.name}>{plan.name}</option>)}<option value="custom">A custom conversation</option></select></label><label>Message<textarea required name="message" rows={4} placeholder="Tell us about your practice and team size" /></label><button className="button button-primary" type="submit">Request a conversation <ArrowRight size={17} /></button></form>}</section>
+        <section className="contact-section" id="contact">
+          <div className="contact-copy">
+            <p className="eyebrow"><span /> Start a conversation</p>
+            <h2>Let’s put your<br /><em>practice in order.</em></h2>
+            <p>Tell us a little about your chambers or firm. We will recommend a plan, set up your workspace, and share login details for every purchased seat.</p>
+            <div className="contact-details">
+              <span><strong>Enquiry</strong> <a href="tel:8447014799">+91 84470 14799</a></span>
+              <span><strong>Email</strong> <a href="mailto:dexforaofficial@gmail.com">dexforaofficial@gmail.com</a></span>
+              <span><strong>Hours</strong> Monday–Saturday · 09:30–19:30 IST</span>
+            </div>
+          </div>
+          {sent ? (
+            <div className="contact-success">
+              <BadgeCheck size={38} style={{ color: "#00D9E8" }} />
+              <h3>Thank you, {formData.name || 'Advocate'}! We received your enquiry.</h3>
+              <p>
+                An email notification has been dispatched to our practice onboarding desk at <strong>dexforaofficial@gmail.com</strong>, and a confirmation note has been sent to <strong>{formData.email}</strong>.
+              </p>
+              <p style={{ marginTop: '0.65rem', color: '#cbd5e1', fontSize: '0.82rem', lineHeight: '1.6' }}>
+                Our team will connect with you shortly to schedule a walkthrough and confirm your private workspace setup, or you can reach us directly at <strong>+91 84470 14799</strong>.
+              </p>
+              <button
+                className="text-link"
+                type="button"
+                style={{ marginTop: '1rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                onClick={() => {
+                  setSent(false);
+                  setFormData({ name: '', firm: '', email: '', phone: '', plan: '', message: '' });
+                }}
+              >
+                Send another enquiry <ArrowRight size={15} />
+              </button>
+            </div>
+          ) : (
+            <form className="contact-form" onSubmit={submitContact}>
+              <div className="form-row">
+                <label>
+                  Name
+                  <input
+                    required
+                    name="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Your name"
+                  />
+                </label>
+                <label>
+                  Firm / chambers
+                  <input
+                    required
+                    name="firm"
+                    value={formData.firm}
+                    onChange={(e) => setFormData({ ...formData, firm: e.target.value })}
+                    placeholder="Firm name"
+                  />
+                </label>
+              </div>
+              <div className="form-row">
+                <label>
+                  Work email
+                  <input
+                    required
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="you@yourfirm.com"
+                  />
+                </label>
+                <label>
+                  <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Phone number (optional)</span>
+                    {formData.phone ? (
+                      <span style={{ color: formData.phone.length === 10 ? '#10b981' : '#64748b', fontWeight: 600, fontSize: '0.62rem' }}>
+                        {formData.phone.length}/10 digits
+                      </span>
+                    ) : null}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'stretch', marginTop: '0.4rem' }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '0 0.85rem',
+                        background: '#eef2f6',
+                        color: '#071B49',
+                        border: '1px solid var(--bd2, #cbd5e1)',
+                        borderRight: 'none',
+                        borderRadius: '6px 0 0 6px',
+                        fontSize: '0.84rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.02em',
+                        userSelect: 'none',
+                        flexShrink: 0,
+                      }}
+                    >
+                      +91
+                    </span>
+                    <input
+                      style={{
+                        marginTop: 0,
+                        borderTopLeftRadius: 0,
+                        borderBottomLeftRadius: 0,
+                      }}
+                      type="tel"
+                      name="phone"
+                      inputMode="numeric"
+                      pattern="[0-9]{10}"
+                      maxLength={10}
+                      value={formData.phone}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setFormData({ ...formData, phone: digits });
+                      }}
+                      placeholder="98765 43210"
+                    />
+                  </div>
+                </label>
+              </div>
+              <label>
+                What are you looking for?
+                <select
+                  name="plan"
+                  value={formData.plan}
+                  onChange={(event) => setFormData({ ...formData, plan: event.target.value })}
+                >
+                  <option value="">Select a plan</option>
+                  {plans.map((plan) => (
+                    <option key={plan.name} value={plan.name}>
+                      {plan.name} (₹{plan.monthly.toLocaleString('en-IN')}/mo)
+                    </option>
+                  ))}
+                  <option value="Custom">A custom conversation / Enterprise</option>
+                </select>
+              </label>
+              <label>
+                Message
+                <textarea
+                  required
+                  name="message"
+                  rows={4}
+                  value={formData.message}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  placeholder="Tell us about your practice and team size"
+                />
+              </label>
+              {submitError && (
+                <div style={{ padding: '8px 12px', background: '#fee2e2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '8px' }}>
+                  {submitError}
+                </div>
+              )}
+              <button className="button button-primary" type="submit" disabled={submitting}>
+                {submitting ? 'Sending enquiry via mail...' : 'Request a conversation'} <ArrowRight size={17} />
+              </button>
+            </form>
+          )}
+        </section>
       </main>
       <footer className="marketing-footer"><a className="marketing-footer-brand" href="#top" aria-label="DexFora home"><img src="/logo.png" alt="DexFora" className="marketing-footer-logo" /></a><span>Enquiry: <a href="tel:8447014799">+91 84470 14799</a> · <a href="mailto:dexforaofficial@gmail.com">dexforaofficial@gmail.com</a></span><span>© 2026 DexFora</span><Link className="owner-footer-link" to="/owner/login">Owner portal</Link></footer>
     </div>

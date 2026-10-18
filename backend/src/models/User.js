@@ -13,6 +13,8 @@ const userSchema = new mongoose.Schema({
   lastLoginAt: Date,
   emailVerified: { type: Boolean, default: false },
   mustChangePassword: { type: Boolean, default: true },
+  setupPasswordToken: { type: String, index: true },
+  setupPasswordExpires: Date,
   permissions: [String],
   googleCalendarEmail: { type: String, lowercase: true, trim: true },
   googleCalendarSync: { type: Boolean, default: false },

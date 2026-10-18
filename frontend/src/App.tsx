@@ -23,6 +23,7 @@ import { AddMatterPage } from './pages/AddMatterPage';
 import { EditProfilePage } from './pages/EditProfilePage';
 import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import { LegalNoticePage } from './pages/LegalNoticePage';
+import { SetPasswordPage } from './pages/SetPasswordPage';
 
 function ApplicationRoutes() {
   const location = useLocation();
@@ -32,6 +33,7 @@ function ApplicationRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/set-password" element={<SetPasswordPage />} />
       <Route path="/owner/login" element={<OwnerLoginPage />} />
       <Route path="/owner" element={<OwnerDashboardPage />} />
       <Route path="/owner/access" element={<OwnerManagementPage />} />

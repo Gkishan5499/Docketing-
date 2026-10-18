@@ -15,4 +15,6 @@ module.exports = {
   Note: require('./Note'),
   WorkLog: require('./WorkLog'),
   LegalNotice: require('./LegalNotice'),
+  PaymentRecord: require('./PaymentRecord'),
+  Enquiry: require('./Enquiry'),
 };

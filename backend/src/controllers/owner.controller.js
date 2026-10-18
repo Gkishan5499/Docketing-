@@ -1,12 +1,21 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('node:crypto');
-const { Organization, User } = require('../models');
+const { Organization, User, PaymentRecord, Enquiry } = require('../models');
 const { fail, ok } = require('../utils');
+const mailer = require('../utils/mailer');
 
 const plans = {
-  'Solo Counsel': { seatsTotal: 1, monthlyValue: 7590 },
-  Chambers: { seatsTotal: 5, monthlyValue: 15990 },
-  'Firm Office': { seatsTotal: 15, monthlyValue: 29990 },
+  'Solo Counsel': { seatsTotal: 1, monthlyValue: 759 },
+  Chambers: { seatsTotal: 5, monthlyValue: 1599 },
+  'Firm Office': { seatsTotal: 15, monthlyValue: 2999 },
+  Custom: { seatsTotal: 20, monthlyValue: 4999 },
+};
+
+const normalizeMonthlyValue = (val) => {
+  if (val === 7590) return 759;
+  if (val === 15990) return 1599;
+  if (val === 29990) return 2999;
+  return Number(val) || 0;
 };
 
 const publicFirm = (organization) => {
@@ -33,7 +42,10 @@ const publicFirm = (organization) => {
       : organization.renewalDate
         ? organization.renewalDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
         : 'Not scheduled',
-    monthlyValue: organization.monthlyValue,
+    rawRenewalDate: organization.renewalDate ? organization.renewalDate.toISOString().split('T')[0] : '',
+    monthlyValue: normalizeMonthlyValue(organization.monthlyValue),
+    lastPaymentDate: organization.lastPaymentDate ? organization.lastPaymentDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
+    lastPaymentAmount: organization.lastPaymentAmount ? normalizeMonthlyValue(organization.lastPaymentAmount) : null,
   };
 };
 
@@ -46,14 +58,20 @@ async function listFirms(req, res, next) {
 
 async function createFirm(req, res, next) {
   try {
-    const { name, owner, email, plan = 'Solo Counsel' } = req.body;
+    const { name, owner, email, plan = 'Solo Counsel', monthlyValue, seatsTotal } = req.body;
     const normalizedEmail = String(email || '').toLowerCase().trim();
     if (!name?.trim() || !owner?.trim() || !normalizedEmail) throw fail('Firm name, owner name, and email are required');
     if (!plans[plan]) throw fail('Invalid subscription plan', 400, 'INVALID_PLAN');
     if (await User.findOne({ email: normalizedEmail, isActive: true })) throw fail('A user with this email already exists', 409, 'EMAIL_EXISTS');
 
     const planDetails = plans[plan];
+    const customMonthly = monthlyValue !== undefined && monthlyValue !== '' ? Math.max(0, Number(monthlyValue)) : planDetails.monthlyValue;
+    const customSeats = seatsTotal !== undefined && seatsTotal !== '' ? Math.max(1, Number(seatsTotal)) : planDetails.seatsTotal;
+
     const temporaryPassword = `${crypto.randomBytes(5).toString('hex')}-${crypto.randomBytes(2).toString('hex')}`;
+    const setupPasswordToken = crypto.randomBytes(32).toString('hex');
+    const setupPasswordExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
     const renewalDate = new Date();
     renewalDate.setDate(renewalDate.getDate() + 30);
     const organization = await Organization.create({
@@ -63,9 +81,9 @@ async function createFirm(req, res, next) {
       ownerEmail: normalizedEmail,
       plan,
       subscription: 'active',
-      seatsTotal: planDetails.seatsTotal,
+      seatsTotal: customSeats,
       seatsUsed: 1,
-      monthlyValue: planDetails.monthlyValue,
+      monthlyValue: customMonthly,
       renewalDate,
       country: 'India',
     });
@@ -78,27 +96,59 @@ async function createFirm(req, res, next) {
         role: 'FIRM_ADMIN',
         organizationId: organization._id,
         mustChangePassword: true,
+        setupPasswordToken,
+        setupPasswordExpires,
       });
     } catch (error) {
       await Organization.deleteOne({ _id: organization._id });
       throw error;
     }
 
-    ok(res, { firm: publicFirm(organization), temporaryPassword }, 'Firm and owner account created successfully');
+    // Dispatch welcome credentials and setup link via Gmail SMTP
+    const origin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : undefined);
+    const emailDelivery = await mailer.sendSubscriptionWelcomeEmail({
+      to: normalizedEmail,
+      name: owner.trim(),
+      firmName: name.trim(),
+      plan,
+      seats: planDetails.seatsTotal,
+      temporaryPassword,
+      setupToken: setupPasswordToken,
+      clientUrl: origin,
+    });
+
+    ok(res, {
+      firm: publicFirm(organization),
+      temporaryPassword,
+      setupPasswordToken,
+      emailDelivery,
+    }, 'Firm and owner account created successfully');
   } catch (error) { next(error); }
 }
 
 async function updateFirm(req, res, next) {
   try {
     const { id } = req.params;
-    const { status, plan, renewMonthly } = req.body;
+    const { status, plan, renewMonthly, monthlyValue, seatsTotal, renewalDate } = req.body;
     const organization = await Organization.findById(id);
     if (!organization) throw fail('Firm organization not found', 404, 'ORG_NOT_FOUND');
 
     if (plan && plans[plan]) {
       organization.plan = plan;
-      organization.seatsTotal = plans[plan].seatsTotal;
-      organization.monthlyValue = plans[plan].monthlyValue;
+      if (seatsTotal === undefined) organization.seatsTotal = plans[plan].seatsTotal;
+      if (monthlyValue === undefined) organization.monthlyValue = plans[plan].monthlyValue;
+    }
+
+    if (monthlyValue !== undefined && monthlyValue !== '') {
+      organization.monthlyValue = Math.max(0, Number(monthlyValue));
+    }
+
+    if (seatsTotal !== undefined && seatsTotal !== '') {
+      organization.seatsTotal = Math.max(1, Number(seatsTotal));
+    }
+
+    if (renewalDate) {
+      organization.renewalDate = new Date(renewalDate);
     }
 
     if (status) {
@@ -219,4 +269,151 @@ async function revokeFirmUser(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { listFirms, createFirm, updateFirm, archiveFirm, listFirmUsers, createFirmUser, revokeFirmUser };
+async function resendFirmInvite(req, res, next) {
+  try {
+    const { id } = req.params;
+    const org = await Organization.findById(id);
+    if (!org) throw fail('Firm organization not found', 404, 'ORG_NOT_FOUND');
+
+    const user = await User.findOne({ organizationId: id, email: org.ownerEmail });
+    if (!user) throw fail('Firm owner account not found', 404, 'USER_NOT_FOUND');
+
+    const temporaryPassword = `${crypto.randomBytes(5).toString('hex')}-${crypto.randomBytes(2).toString('hex')}`;
+    const setupPasswordToken = crypto.randomBytes(32).toString('hex');
+    const setupPasswordExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    user.passwordHash = await bcrypt.hash(temporaryPassword, 12);
+    user.mustChangePassword = true;
+    user.setupPasswordToken = setupPasswordToken;
+    user.setupPasswordExpires = setupPasswordExpires;
+    await user.save();
+
+    const origin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : undefined);
+    const emailDelivery = await mailer.sendSubscriptionWelcomeEmail({
+      to: user.email,
+      name: user.name,
+      firmName: org.name,
+      plan: org.plan,
+      seats: org.seatsTotal,
+      temporaryPassword,
+      setupToken: setupPasswordToken,
+      clientUrl: origin,
+    });
+
+    ok(res, {
+      temporaryPassword,
+      setupPasswordToken,
+      emailDelivery,
+    }, 'Welcome credentials and setup link dispatched');
+  } catch (error) { next(error); }
+}
+
+async function testSmtp(req, res, next) {
+  try {
+    const result = await mailer.verifySmtp();
+    ok(res, result, result.message);
+  } catch (error) { next(error); }
+}
+
+async function recordPayment(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { amount, paymentDate, paymentMethod = 'UPI', referenceNumber, periodMonths = 1, notes } = req.body;
+    if (amount === undefined || amount === '' || Number(amount) < 0) {
+      throw fail('Valid payment amount is required');
+    }
+
+    const organization = await Organization.findById(id);
+    if (!organization) throw fail('Firm organization not found', 404, 'ORG_NOT_FOUND');
+
+    const paymentAmount = Number(amount);
+    const months = Math.max(1, Number(periodMonths) || 1);
+    const pDate = paymentDate ? new Date(paymentDate) : new Date();
+
+    const payment = await PaymentRecord.create({
+      organizationId: organization._id,
+      firmName: organization.name,
+      amount: paymentAmount,
+      paymentDate: pDate,
+      paymentMethod,
+      referenceNumber: referenceNumber?.trim(),
+      periodMonths: months,
+      notes: notes?.trim(),
+      recordedBy: req.user?._id,
+    });
+
+    // Update organization renewal date and status
+    const baseDate = organization.renewalDate && organization.renewalDate > new Date()
+      ? new Date(organization.renewalDate)
+      : new Date();
+    baseDate.setDate(baseDate.getDate() + (months * 30));
+
+    organization.renewalDate = baseDate;
+    organization.lastPaymentDate = pDate;
+    organization.lastPaymentAmount = paymentAmount;
+    organization.subscription = 'active';
+    organization.isActive = true;
+    await organization.save();
+
+    ok(res, {
+      payment,
+      firm: publicFirm(organization),
+    }, 'Payment recorded and subscription renewed successfully');
+  } catch (error) { next(error); }
+}
+
+async function listPayments(req, res, next) {
+  try {
+    const filter = req.params.id ? { organizationId: req.params.id } : {};
+    const payments = await PaymentRecord.find(filter).sort({ paymentDate: -1, createdAt: -1 }).limit(100);
+    ok(res, payments, 'Payment history fetched successfully');
+  } catch (error) { next(error); }
+}
+
+async function getBillingOverview(req, res, next) {
+  try {
+    const firms = await Organization.find({ ownerEmail: { $exists: true, $ne: '' } }).sort({ createdAt: -1 });
+    const payments = await PaymentRecord.find().sort({ paymentDate: -1, createdAt: -1 }).limit(50);
+    const enquiries = await Enquiry.find().sort({ createdAt: -1 }).limit(50);
+
+    const activeFirms = firms.filter((f) => f.subscription === 'active' && f.isActive);
+    const totalMRR = activeFirms.reduce((sum, f) => sum + normalizeMonthlyValue(f.monthlyValue), 0);
+    const totalCollected = await PaymentRecord.aggregate([
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+
+    const now = new Date();
+    const renewalsNext7Days = firms.filter((f) => {
+      if (!f.renewalDate) return false;
+      const diffDays = Math.ceil((new Date(f.renewalDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays <= 7;
+    }).length;
+
+    ok(res, {
+      totalMRR,
+      annualRunRate: totalMRR * 12,
+      totalCollected: totalCollected[0]?.total || 0,
+      activeFirmsCount: activeFirms.length,
+      renewalsNext7Days,
+      enquiriesCount: enquiries.length,
+      firms: firms.map(publicFirm),
+      recentPayments: payments,
+      recentEnquiries: enquiries,
+    }, 'Billing overview fetched successfully');
+  } catch (error) { next(error); }
+}
+
+module.exports = {
+  listFirms,
+  createFirm,
+  updateFirm,
+  archiveFirm,
+  listFirmUsers,
+  createFirmUser,
+  revokeFirmUser,
+  resendFirmInvite,
+  testSmtp,
+  recordPayment,
+  listPayments,
+  getBillingOverview,
+};

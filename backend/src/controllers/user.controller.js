@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('node:crypto');
 const { User, Organization } = require('../models');
 const { fail, ok } = require('../utils');
+const mailer = require('../utils/mailer');
 
 const roles = ['ATTORNEY', 'PARALEGAL', 'STAFF', 'VIEWER'];
 
@@ -49,6 +50,8 @@ async function inviteUser(req, res, next) {
     const normalizedEmail = String(email).toLowerCase().trim();
     const existing = await User.findOne({ organizationId: req.organizationId, email: normalizedEmail });
     const temporaryPassword = `${crypto.randomBytes(4).toString('hex')}-${crypto.randomBytes(2).toString('hex')}`;
+    const setupPasswordToken = crypto.randomBytes(32).toString('hex');
+    const setupPasswordExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const cleanGcalEmail = googleCalendarEmail ? String(googleCalendarEmail).toLowerCase().trim() : (normalizedEmail.includes('@gmail.com') ? normalizedEmail : undefined);
 
     let user;
@@ -61,6 +64,8 @@ async function inviteUser(req, res, next) {
       existing.isActive = true;
       existing.passwordHash = await bcrypt.hash(temporaryPassword, 12);
       existing.mustChangePassword = true;
+      existing.setupPasswordToken = setupPasswordToken;
+      existing.setupPasswordExpires = setupPasswordExpires;
       if (cleanGcalEmail) {
         existing.googleCalendarEmail = cleanGcalEmail;
         existing.googleCalendarSync = true;
@@ -75,6 +80,8 @@ async function inviteUser(req, res, next) {
         organizationId: req.organizationId,
         passwordHash: await bcrypt.hash(temporaryPassword, 12),
         mustChangePassword: true,
+        setupPasswordToken,
+        setupPasswordExpires,
         createdBy: req.user._id,
         googleCalendarEmail: cleanGcalEmail,
         googleCalendarSync: Boolean(cleanGcalEmail),
@@ -86,6 +93,18 @@ async function inviteUser(req, res, next) {
     org.seatsUsed = Math.min(org.seatsTotal, activeSeats + 1);
     await org.save().catch(() => {});
 
+    // Send team invitation email
+    const origin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : undefined);
+    const emailDelivery = await mailer.sendTeamInviteEmail({
+      to: normalizedEmail,
+      name: name.trim(),
+      firmName: org.name,
+      role,
+      temporaryPassword,
+      setupToken: setupPasswordToken,
+      clientUrl: origin,
+    });
+
     ok(res, {
       user: {
         id: user._id,
@@ -96,7 +115,9 @@ async function inviteUser(req, res, next) {
         isActive: user.isActive,
       },
       temporaryPassword,
-      instruction: 'Share these credentials securely. The lawyer must change their password on first sign-in before accessing practice data.',
+      setupPasswordToken,
+      emailDelivery,
+      instruction: 'Credentials and password setup link dispatched. The lawyer must set their permanent password before accessing practice data.',
     }, 'Lawyer account created successfully');
   } catch (error) { next(error); }
 }

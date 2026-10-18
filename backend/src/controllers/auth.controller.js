@@ -71,6 +71,73 @@ async function refresh(req, res, next) {
   } catch (error) { next(Object.assign(error, { status: 401, code: 'INVALID_REFRESH_TOKEN' })); }
 }
 
+async function setupPassword(req, res, next) {
+  try {
+    const { email, token, currentPassword, newPassword } = req.body;
+    const normalizedEmail = String(email || '').toLowerCase().trim();
+    if (!normalizedEmail) throw fail('Email is required');
+    if (!newPassword || newPassword.length < 8) {
+      throw fail('New password must be at least 8 characters long');
+    }
+
+    const user = await User.findOne({ email: normalizedEmail, isActive: true }).select('+passwordHash');
+    if (!user) throw fail('Account not found', 404, 'USER_NOT_FOUND');
+
+    let isAuthorized = false;
+
+    // Check by token if provided
+    if (token && user.setupPasswordToken === token) {
+      if (user.setupPasswordExpires && user.setupPasswordExpires < new Date()) {
+        throw fail('Setup link has expired. Please use your temporary password or request a new link.', 400, 'TOKEN_EXPIRED');
+      }
+      isAuthorized = true;
+    } else if (currentPassword) {
+      // Check by temporary / current password
+      const match = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!match) throw fail('Invalid temporary or current password', 400, 'INVALID_PASSWORD');
+      isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
+      throw fail('Invalid or expired setup token / credentials', 400, 'INVALID_AUTH');
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+    user.mustChangePassword = false;
+    user.setupPasswordToken = undefined;
+    user.setupPasswordExpires = undefined;
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    setAuthCookies(res, user);
+    ok(res, { user: publicUser(user) }, 'Password created successfully! You are now logged in.');
+  } catch (error) { next(error); }
+}
+
+async function verifySetupToken(req, res, next) {
+  try {
+    const { token, email } = req.query;
+    const normalizedEmail = String(email || '').toLowerCase().trim();
+    if (!token || !normalizedEmail) throw fail('Token and email required');
+
+    const user = await User.findOne({ email: normalizedEmail, setupPasswordToken: token, isActive: true });
+    if (!user) throw fail('Invalid setup token or email', 404, 'INVALID_TOKEN');
+
+    if (user.setupPasswordExpires && user.setupPasswordExpires < new Date()) {
+      throw fail('Setup link has expired', 410, 'TOKEN_EXPIRED');
+    }
+
+    const org = user.organizationId ? await Organization.findById(user.organizationId) : null;
+
+    ok(res, {
+      name: user.name,
+      email: user.email,
+      firmName: org?.name || 'DexFora Chambers',
+      plan: org?.plan || 'Solo Counsel',
+    }, 'Token is valid');
+  } catch (error) { next(error); }
+}
+
 async function changePassword(req, res, next) {
   try {
     const user = await User.findById(req.user._id).select('+passwordHash');
@@ -88,4 +155,14 @@ async function changePassword(req, res, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { register, login, logout, refresh, changePassword, publicUser, setAuthCookies };
+module.exports = {
+  register,
+  login,
+  logout,
+  refresh,
+  changePassword,
+  setupPassword,
+  verifySetupToken,
+  publicUser,
+  setAuthCookies,
+};
