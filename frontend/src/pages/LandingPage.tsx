@@ -19,23 +19,23 @@ import { Link } from 'react-router-dom';
 const plans = [
   {
     name: 'Solo Counsel',
-    monthly: 1499,
-    yearly: 14990,
+    monthly: 759,
+    yearly: 7590,
     description: 'A focused command centre for an independent practice.',
     features: ['1 advocate account', 'Unlimited matters and clients', 'Docket calendar and reminders', 'Secure document workspace'],
   },
   {
     name: 'Chambers',
-    monthly: 3999,
-    yearly: 39990,
+    monthly: 1599,
+    yearly: 15990,
     description: 'The shared workspace for a growing legal team.',
     features: ['Up to 5 team accounts', 'Role-based access controls', 'Matter assignments and task tracking', 'Audit history and reports'],
     featured: true,
   },
   {
     name: 'Firm Office',
-    monthly: 7999,
-    yearly: 79990,
+    monthly: 2999,
+    yearly: 29990,
     description: 'A private operating layer for established firms.',
     features: ['Up to 15 team accounts', 'Priority onboarding support', 'Advanced reporting workspace', 'Custom firm configuration'],
   },
@@ -44,11 +44,11 @@ const plans = [
 const faqs = [
   ['How do lawyers get access?', 'After purchase, we create the firm workspace and share individual login credentials securely with each authorized user.'],
   ['Can I change plans later?', 'Yes. You can move between plans as your team changes. We will help with the transition and preserve your matter history.'],
-  ['Is my legal data private?', 'Lawyers Diary is designed around firm-level access controls, authenticated sessions, audit history, and protected document access.'],
+  ['Is my legal data private?', 'DexFora is designed around firm-level access controls, authenticated sessions, audit history, and protected document access.'],
 ];
 
 export const LandingPage: React.FC = () => {
-  const [billing, setBilling] = useState<'monthly' | 'yearly'>('yearly');
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('');
   const [sent, setSent] = useState(false);
@@ -67,9 +67,8 @@ export const LandingPage: React.FC = () => {
   return (
     <div className="marketing-page">
       <header className="marketing-nav">
-        <a className="marketing-brand" href="#top" aria-label="Lawyers Diary home">
-          <span className="marketing-mark"><Scale size={19} /></span>
-          <span>Lawyers <strong>Diary</strong></span>
+        <a className="marketing-brand" href="#top" aria-label="DexFora home">
+          <img src="/logo.png" alt="DexFora" className="marketing-nav-logo" />
         </a>
         <button className="marketing-menu" type="button" onClick={() => setMobileOpen((open) => !open)} aria-label="Toggle navigation">
           {mobileOpen ? <X size={21} /> : <Menu size={21} />}
@@ -88,14 +87,14 @@ export const LandingPage: React.FC = () => {
           <div className="hero-copy">
             <p className="eyebrow"><span /> Practice software for serious legal work</p>
             <h1>Your docket.<br /><em>Under control.</em></h1>
-            <p className="hero-lede">Lawyers Diary gives advocates one calm, private place to run matters, protect deadlines, and keep every client commitment visible.</p>
+            <p className="hero-lede">DexFora gives advocates one calm, private place to run matters, protect deadlines, and keep every client commitment visible.</p>
             <div className="hero-actions">
               <button className="button button-primary" type="button" onClick={() => selectPlan('Chambers')}>Choose your plan <ArrowRight size={17} /></button>
               <a className="text-link" href="#product">See how it works <ChevronDown size={16} /></a>
             </div>
             <div className="hero-proof"><BadgeCheck size={17} /><span>Built for Indian courts, registries, tribunals, and IP practice</span></div>
           </div>
-          <div className="hero-console" aria-label="Lawyers Diary product preview">
+          <div className="hero-console" aria-label="DexFora product preview">
             <div className="console-top"><span className="console-kicker">Today in chambers</span><span className="console-date">19 Aug 2026 <ChevronDown size={14} /></span></div>
             <div className="console-heading"><div><span className="console-label">Good morning, Advocate</span><h2>Keep the day moving.</h2></div><span className="console-avatar">AD</span></div>
             <div className="console-metrics"><div><strong>24</strong><span>Active matters</span></div><div className="metric-alert"><strong>03</strong><span>Due this week</span></div><div><strong>08</strong><span>Open tasks</span></div></div>
@@ -107,7 +106,7 @@ export const LandingPage: React.FC = () => {
         <section className="trust-strip"><span>For advocates who manage more than a calendar</span><div><span><Scale size={17} /> Court matters</span><span><FileText size={17} /> IP portfolios</span><span><UsersRound size={17} /> Firm teams</span><span><ShieldCheck size={17} /> Private records</span></div></section>
 
         <section className="marketing-section product-section" id="product">
-          <div className="section-intro"><p className="eyebrow"><span /> One practice, one view</p><h2>The work is complex.<br /><em>Your system should not be.</em></h2><p>Stop piecing together spreadsheets, chat messages, calendar alerts, and scattered folders. Lawyers Diary turns the daily rhythm of legal practice into a dependable operating system.</p></div>
+          <div className="section-intro"><p className="eyebrow"><span /> One practice, one view</p><h2>The work is complex.<br /><em>Your system should not be.</em></h2><p>Stop piecing together spreadsheets, chat messages, calendar alerts, and scattered folders. DexFora turns the daily rhythm of legal practice into a dependable operating system.</p></div>
           <div className="feature-grid"><article><span className="feature-number">01</span><CalendarClock size={24} /><h3>Never miss the next date</h3><p>See hearings, FER replies, filings, and follow-ups in one docket calendar with clear priority and ownership.</p></article><article><span className="feature-number">02</span><Search size={24} /><h3>Find the matter instantly</h3><p>Search across clients, case numbers, marks, courts, documents, and notes without leaving your practice workspace.</p></article><article><span className="feature-number">03</span><LockKeyhole size={24} /><h3>Keep access intentional</h3><p>Give each lawyer and staff member the right workspace, with firm-level permissions and a durable activity trail.</p></article></div>
         </section>
 
@@ -117,9 +116,9 @@ export const LandingPage: React.FC = () => {
 
         <section className="faq-section"><div><p className="eyebrow"><span /> Before you begin</p><h2>A better way to<br /><em>run the day.</em></h2></div><div className="faq-list">{faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={17} /></summary><p>{answer}</p></details>)}</div></section>
 
-        <section className="contact-section" id="contact"><div className="contact-copy"><p className="eyebrow"><span /> Start a conversation</p><h2>Let’s put your<br /><em>practice in order.</em></h2><p>Tell us a little about your chambers or firm. We will recommend a plan, set up your workspace, and share login details for every purchased seat.</p><div className="contact-details"><span><strong>Email</strong> hello@lawyersdiary.in</span><span><strong>Hours</strong> Monday–Friday · 10:00–18:00 IST</span></div></div>{sent ? <div className="contact-success"><BadgeCheck size={36} /><h3>Thank you. We have your note.</h3><p>Our team will contact you shortly about your Lawyers Diary workspace.</p><button className="text-link" type="button" onClick={() => setSent(false)}>Send another enquiry <ArrowRight size={15} /></button></div> : <form className="contact-form" onSubmit={submitContact}><div className="form-row"><label>Name<input required name="name" placeholder="Your name" /></label><label>Firm / chambers<input required name="firm" placeholder="Firm name" /></label></div><label>Work email<input required type="email" name="email" placeholder="you@yourfirm.com" /></label><label>What are you looking for?<select name="plan" value={selectedPlan} onChange={(event) => setSelectedPlan(event.target.value)}><option value="">Select a plan</option>{plans.map((plan) => <option key={plan.name} value={plan.name}>{plan.name}</option>)}<option value="custom">A custom conversation</option></select></label><label>Message<textarea required name="message" rows={4} placeholder="Tell us about your practice and team size" /></label><button className="button button-primary" type="submit">Request a conversation <ArrowRight size={17} /></button></form>}</section>
+        <section className="contact-section" id="contact"><div className="contact-copy"><p className="eyebrow"><span /> Start a conversation</p><h2>Let’s put your<br /><em>practice in order.</em></h2><p>Tell us a little about your chambers or firm. We will recommend a plan, set up your workspace, and share login details for every purchased seat.</p><div className="contact-details"><span><strong>Enquiry</strong> <a href="tel:8447014799">+91 84470 14799</a></span><span><strong>Email</strong> <a href="mailto:dexforaofficial@gmail.com">dexforaofficial@gmail.com</a></span><span><strong>Hours</strong> Monday–Saturday · 09:30–19:30 IST</span></div></div>{sent ? <div className="contact-success"><BadgeCheck size={36} /><h3>Thank you. We have your note.</h3><p>Our team will contact you shortly about your DexFora workspace, or you can reach us directly at +91 84470 14799.</p><button className="text-link" type="button" onClick={() => setSent(false)}>Send another enquiry <ArrowRight size={15} /></button></div> : <form className="contact-form" onSubmit={submitContact}><div className="form-row"><label>Name<input required name="name" placeholder="Your name" /></label><label>Firm / chambers<input required name="firm" placeholder="Firm name" /></label></div><label>Work email<input required type="email" name="email" placeholder="you@yourfirm.com" /></label><label>What are you looking for?<select name="plan" value={selectedPlan} onChange={(event) => setSelectedPlan(event.target.value)}><option value="">Select a plan</option>{plans.map((plan) => <option key={plan.name} value={plan.name}>{plan.name}</option>)}<option value="custom">A custom conversation</option></select></label><label>Message<textarea required name="message" rows={4} placeholder="Tell us about your practice and team size" /></label><button className="button button-primary" type="submit">Request a conversation <ArrowRight size={17} /></button></form>}</section>
       </main>
-      <footer className="marketing-footer"><a className="marketing-brand" href="#top"><span className="marketing-mark"><Scale size={17} /></span><span>Lawyers <strong>Diary</strong></span></a><span>Professional practice software for lawyers.</span><span>© 2026 Lawyers Diary</span><Link className="owner-footer-link" to="/owner/login">Owner portal</Link></footer>
+      <footer className="marketing-footer"><a className="marketing-footer-brand" href="#top" aria-label="DexFora home"><img src="/logo.png" alt="DexFora" className="marketing-footer-logo" /></a><span>Enquiry: <a href="tel:8447014799">+91 84470 14799</a> · <a href="mailto:dexforaofficial@gmail.com">dexforaofficial@gmail.com</a></span><span>© 2026 DexFora</span><Link className="owner-footer-link" to="/owner/login">Owner portal</Link></footer>
     </div>
   );
 };

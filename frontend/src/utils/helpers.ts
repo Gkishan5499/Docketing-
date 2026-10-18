@@ -197,12 +197,12 @@ export const printDailyCauseList = (deadlines: Array<{
   const sorted = [...deadlines].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const w = window.open('', '_blank');
   if (!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><title>Lawyers Diary – Cause List</title><style>body{font-family:Arial,sans-serif;max-width:780px;margin:40px auto;color:#1a2540}h1{font-size:1.35rem;border-bottom:3px solid #c89b30;padding-bottom:.5rem}table{width:100%;border-collapse:collapse;font-size:.83rem}th{background:#1a3a6e;color:#fff;padding:.5rem .75rem;text-align:left}td{padding:.5rem .75rem;border-bottom:1px solid #e0e0e0}.ug{color:#c0392b;font-weight:bold}.wa{color:#c89b30}</style></head><body><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><div style="font-size:1.5rem;font-weight:900;color:#1a3a6e">Lawyers <span style="color:#c89b30">Diary</span></div><div style="font-size:.72rem;color:#8a9bb5">CONFIDENTIAL · Legal Practice Management</div></div><h1>Daily Cause List</h1><p style="color:#8a9bb5;font-size:.82rem;margin-bottom:1.5rem">${tf}</p><table><thead><tr><th>Date</th><th>Days</th><th>Type</th><th>Matter</th><th>Venue</th><th>Attorney</th></tr></thead><tbody>${sorted.map(d => {
+  w.document.write(`<!DOCTYPE html><html><head><title>DexFora – Daily Cause List</title><style>body{font-family:Arial,sans-serif;max-width:780px;margin:40px auto;color:#071B49}h1{font-size:1.35rem;border-bottom:3px solid #0047D9;padding-bottom:.5rem;color:#071B49}table{width:100%;border-collapse:collapse;font-size:.83rem}th{background:#071B49;color:#fff;padding:.5rem .75rem;text-align:left}td{padding:.5rem .75rem;border-bottom:1px solid #e0e0e0}.ug{color:#c0392b;font-weight:bold}.wa{color:#0047D9}\</style></head><body><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem"><div style="font-size:1.5rem;font-weight:900;color:#071B49">Dex<span style="color:#008CFF">Fora</span></div><div style="font-size:.72rem;color:#64748b">CONFIDENTIAL · Legal Practice Management</div></div><h1>Daily Cause List</h1><p style="color:#64748b;font-size:.82rem;margin-bottom:1.5rem">${tf}</p><table><thead><tr><th>Date</th><th>Days</th><th>Type</th><th>Matter</th><th>Venue</th><th>Attorney</th></tr></thead><tbody>${sorted.map(d => {
     const diff = dDiff(d.date) ?? 0;
     const c = diff <= 3 ? 'ug' : diff <= 14 ? 'wa' : '';
     const label = diff < 0 ? 'OVERDUE' : diff === 0 ? 'TODAY' : `${diff} days`;
     return `<tr><td class="${c}">${d.date}</td><td class="${c}">${label}</td><td>${d.type}</td><td>${d.matterName}</td><td>${d.venue || '—'}</td><td>${d.attorney}</td></tr>`;
-  }).join('')}</tbody></table><p style="font-size:.7rem;color:#aaa;margin-top:2rem;border-top:1px solid #e0e0e0;padding-top:1rem">Lawyers Diary · ${now.toLocaleString()}</p></body></html>`);
+  }).join('')}</tbody></table><p style="font-size:.7rem;color:#aaa;margin-top:2rem;border-top:1px solid #e0e0e0;padding-top:1rem">DexFora · ${now.toLocaleString()}</p></body></html>`);
   w.document.close();
   w.print();
 };
@@ -335,17 +335,17 @@ export const downloadDocumentPdf = (doc: DocumentFile) => {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 2px solid #172554;
+      border-bottom: 2px solid #071B49;
       padding-bottom: 12px;
       margin-bottom: 22px;
     }
     .logo {
       font-size: 22px;
       font-weight: bold;
-      color: #172554;
-      font-family: Georgia, serif;
+      color: #071B49;
+      font-family: inherit;
     }
-    .logo span { color: #b08d57; }
+    .logo span { color: #008CFF; }
     .doc-badge {
       font-size: 11px;
       text-transform: uppercase;
@@ -437,7 +437,7 @@ export const downloadDocumentPdf = (doc: DocumentFile) => {
 </head>
 <body>
   <div class="header">
-    <div class="logo">Lawyers <span>Diary</span></div>
+    <div class="logo">Dex<span>Fora</span></div>
     <div class="doc-badge">${doc.type.toUpperCase()} LEGAL VAULT FILE</div>
   </div>
 
@@ -461,7 +461,7 @@ export const downloadDocumentPdf = (doc: DocumentFile) => {
       This document constitutes an authenticated record filed under the <strong>${folder}</strong> repository for <strong>${matterName}</strong>. All evidentiary annexures, affidavit statements, power of attorney filings, and court orders attached to this file are verified by the practicing counsel of record.
     </p>
     <p style="text-align: justify; line-height: 1.8;">
-      The original copy is stored with AES-256 encryption in Lawyers Diary Document Vault and synchronized with firm cloud workspace drives.
+      The original copy is stored with AES-256 encryption in DexFora Document Vault and synchronized with firm cloud workspace drives.
     </p>
 
     <div class="signature-block">
@@ -478,7 +478,7 @@ export const downloadDocumentPdf = (doc: DocumentFile) => {
   </div>
 
   <div class="footer">
-    <span>Lawyers Diary Practice Management · Document Vault ID: ${doc.id}</span>
+    <span>DexFora Practice Management · Document Vault ID: ${doc.id}</span>
     <span>Page 1 of 1</span>
   </div>
 

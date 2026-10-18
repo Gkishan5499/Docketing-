@@ -69,9 +69,9 @@ const planSeats: Record<string, number> = {
 };
 
 const planValue: Record<string, number> = {
-  "Solo Counsel": 9990,
-  Chambers: 24980,
-  "Firm Office": 49990,
+  "Solo Counsel": 7590,
+  Chambers: 15990,
+  "Firm Office": 29990,
 };
 
 const readFirms = (): Firm[] => {
@@ -381,7 +381,7 @@ export const OwnerDashboardPage: React.FC = () => {
               <h2>
                 The firms using
                 <br />
-                <em>Lawyers Diary.</em>
+                <em>DexFora.</em>
               </h2>
               <p>
                 Provision access only after a plan is confirmed. Each firm
@@ -624,7 +624,7 @@ export const OwnerDashboardPage: React.FC = () => {
                 type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(
-                    `Lawyers Diary login\nFirm: ${credentials.firmName}\nEmail: ${credentials.email}\nTemporary password: ${credentials.temporaryPassword}`,
+                    `DexFora login\nFirm: ${credentials.firmName}\nEmail: ${credentials.email}\nTemporary password: ${credentials.temporaryPassword}`,
                   );
                 }}
               >
@@ -767,7 +767,7 @@ export const OwnerDashboardPage: React.FC = () => {
                   style={{ gridColumn: "1 / -1", marginTop: "0.5rem" }}
                   onClick={() => {
                     navigator.clipboard.writeText(
-                      `Lawyers Diary login\nFirm: ${selectedFirmForTeam.name}\nEmail: ${provisionedCreds.email}\nTemporary password: ${provisionedCreds.temporaryPassword}\nFirst sign-in requires setting your permanent password.`
+                      `DexFora login\nFirm: ${selectedFirmForTeam.name}\nEmail: ${provisionedCreds.email}\nTemporary password: ${provisionedCreds.temporaryPassword}\nFirst sign-in requires setting your permanent password.`
                     );
                   }}
                 >

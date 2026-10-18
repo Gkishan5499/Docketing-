@@ -73,7 +73,7 @@ export const Topbar: React.FC = () => {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const currentTitle = pageTitles[location.pathname] || 'Lawyers Diary';
+  const currentTitle = pageTitles[location.pathname] || 'DexFora';
 
   // Close dropdown when clicking outside
   useEffect(() => {

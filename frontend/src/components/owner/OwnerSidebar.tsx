@@ -27,9 +27,7 @@ export const OwnerSidebar: React.FC = () => {
   return (
     <aside className="owner-sidebar">
       <Link to="/" className="owner-brand">
-        <span>LD</span>
-        <strong>Lawyers Diary</strong>
-        <small>Platform console</small>
+        <img src="/logo-white.png" alt="DexFora" className="owner-sidebar-logo" />
       </Link>
       <div className="owner-nav-label">Manage</div>
       <nav aria-label="Owner platform navigation">

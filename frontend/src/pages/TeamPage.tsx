@@ -170,7 +170,7 @@ export const TeamPage: React.FC = () => {
   const copyCredentials = async () => {
     if (!credentials) return;
     await navigator.clipboard.writeText(
-      `Lawyers Diary login\nEmail: ${credentials.email}\nTemporary password: ${credentials.password}\nNote: You will be prompted to set your private permanent password on first sign-in.`,
+      `DexFora login\nEmail: ${credentials.email}\nTemporary password: ${credentials.password}\nNote: You will be prompted to set your private permanent password on first sign-in.`,
     );
     setCopied(true);
     showToast("Credentials copied to clipboard", "ok");

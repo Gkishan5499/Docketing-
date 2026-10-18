@@ -684,7 +684,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     (event: DocketEvent) => {
       openGoogleCalendarEvent(event, {
         lawyerGmail: googleCalendarEmail,
-        firmName: 'Lawyers Diary',
+        firmName: 'DexFora',
       });
       showToast(`Opening Google Calendar for "${event.matterName}"…`, 'in');
     },
@@ -697,8 +697,8 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (googleCalendarScope === 'assigned' && currentUser) {
         list = list.filter((e) => e.attorney === currentUser || e.attorney === 'Self');
       }
-      const ics = generateIcsContent(list, 'Lawyers Diary — Master Court Docket');
-      downloadIcsFile('lawyers_diary_court_docket.ics', ics);
+      const ics = generateIcsContent(list, 'DexFora — Master Court Docket');
+      downloadIcsFile('dexfora_court_docket.ics', ics);
       showToast(`Exported ${list.length} court events into .ics for Google Calendar.`, 'ok');
     },
     [deadlines, googleCalendarScope, currentUser, showToast]

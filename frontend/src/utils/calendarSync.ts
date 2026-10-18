@@ -69,7 +69,7 @@ export function buildGoogleCalendarUrl(
   const title = `⚖️ [Court] ${event.type}: ${event.matterName}`;
 
   const detailsLines = [
-    `🏛️ LAWYERS DIARY — COURT LISTING & DOCKET`,
+    `🏛️ DEXFORA — COURT LISTING & DOCKET`,
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
     `• Matter / Case: ${event.matterName}`,
     `• Docket Event: ${event.type}`,
@@ -79,7 +79,7 @@ export function buildGoogleCalendarUrl(
     `• Priority: ${event.priority === 'ug' ? 'URGENT' : event.priority === 'wa' ? 'High Attention' : 'Standard'}`,
     event.notes ? `• Notes & Instructions:\n  ${event.notes}` : '',
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `Synced automatically from Lawyers Diary Chambers System`,
+    `Synced automatically from DexFora Chambers System`,
     options?.firmName ? `Firm: ${options.firmName}` : '',
   ].filter(Boolean);
 
@@ -124,7 +124,7 @@ export function openGoogleCalendarEvent(
  */
 export function generateIcsContent(
   events: DocketEvent[],
-  calendarName = 'Lawyers Diary — Court Docket'
+  calendarName = 'DexFora — Court Docket'
 ): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -138,7 +138,7 @@ export function generateIcsContent(
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Lawyers Diary//Court Docketing System//EN',
+    'PRODID:-//DexFora//Court Docketing System//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeIcs(calendarName)}`,

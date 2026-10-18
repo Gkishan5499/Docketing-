@@ -65,7 +65,7 @@ export const ForcePasswordChangeModal: React.FC = () => {
         </div>
 
         <p className="force-pwd-lead">
-          Welcome to Lawyers Diary, <strong>{currentUser || currentEmail}</strong>. You signed in using temporary credentials. To protect attorney-client confidentiality and docket security, you must choose your private password before accessing your firm's cases.
+          Welcome to DexFora, <strong>{currentUser || currentEmail}</strong>. You signed in using temporary credentials. To protect attorney-client confidentiality and docket security, you must choose your private password before accessing your firm's cases.
         </p>
 
         <form onSubmit={handleSubmit} className="force-pwd-form">

@@ -19,8 +19,7 @@ export const LoginPage: React.FC = () => {
     <div id="login">
       <aside className="login-aside">
         <Link to="/" className="login-aside-brand">
-          <span><Scale size={19} /></span>
-          <strong>Lawyers Diary</strong>
+          <img src="/logo-white.png" alt="DexFora" className="login-aside-logo" />
         </Link>
         <div className="login-aside-copy">
           <span className="login-eyebrow">Private practice workspace</span>
@@ -34,7 +33,9 @@ export const LoginPage: React.FC = () => {
       </aside>
       <div className="lc">
         <div className="login-card-heading">
-          <span className="login-card-mark"><Scale size={21} /></span>
+          <div className="logo-sq" style={{ width: '48px', height: '48px' }}>
+            <img src="/favicon.png" alt="DexFora" className="logo-icon-img" />
+          </div>
           <div>
             <span className="login-eyebrow">Advocate portal</span>
             <h2>Welcome back.</h2>
@@ -78,11 +79,11 @@ export const LoginPage: React.FC = () => {
         </form>
 
         <Link to="/" className="login-back-link">
-          Back to Lawyers Diary
+          Back to DexFora
         </Link>
 
         <div className="login-card-footer">
-          Lawyers Diary Enterprise <span>·</span> Cloud-encrypted practice management
+          DexFora Enterprise <span>·</span> Cloud-encrypted practice management
         </div>
       </div>
     </div>

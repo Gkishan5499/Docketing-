@@ -4,9 +4,9 @@ const { Organization, User } = require('../models');
 const { fail, ok } = require('../utils');
 
 const plans = {
-  'Solo Counsel': { seatsTotal: 1, monthlyValue: 9990 },
-  Chambers: { seatsTotal: 5, monthlyValue: 24980 },
-  'Firm Office': { seatsTotal: 15, monthlyValue: 49990 },
+  'Solo Counsel': { seatsTotal: 1, monthlyValue: 7590 },
+  Chambers: { seatsTotal: 5, monthlyValue: 15990 },
+  'Firm Office': { seatsTotal: 15, monthlyValue: 29990 },
 };
 
 const publicFirm = (organization) => {

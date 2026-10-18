@@ -46,10 +46,10 @@ export const OwnerLoginPage: React.FC = () => {
   return (
     <main className="owner-login-page">
       <section className="owner-login-card">
-        <div className="owner-login-mark">
-          <KeyRound size={22} />
+        <div className="logo-sq" style={{ width: '56px', height: '56px', marginBottom: '1.2rem' }}>
+          <img src="/favicon.png" alt="DexFora" className="logo-icon-img" />
         </div>
-        <p className="owner-kicker">Platform administration</p>
+        <p className="owner-kicker">DexFora Platform Administration</p>
         <h1>Owner portal</h1>
         <p className="owner-login-copy">
           Manage subscribed firms, plans, seats, and secure lawyer access from
@@ -91,7 +91,7 @@ export const OwnerLoginPage: React.FC = () => {
           workspaces.
         </div>
         <Link className="owner-back-link" to="/">
-          Back to Lawyers Diary
+          Back to DexFora
         </Link>
       </section>
     </main>

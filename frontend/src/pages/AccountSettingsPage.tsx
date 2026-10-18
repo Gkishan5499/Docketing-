@@ -138,7 +138,7 @@ export const AccountSettingsPage: React.FC = () => {
                 <Bell size={20} />
                 <div>
                   <h2>Notification Preferences</h2>
-                  <p>Control how and when Lawyers Diary alerts you about your practice.</p>
+                  <p>Control how and when DexFora alerts you about your practice.</p>
                 </div>
               </div>
 

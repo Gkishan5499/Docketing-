@@ -183,12 +183,15 @@ export const Sidebar: React.FC = () => {
     <aside id="sb" className={sidebarMinimized ? 'mi' : ''}>
       {/* Brand Header */}
       <div className="bw" onClick={toggleSidebar} title="Toggle Sidebar">
-        <div className="logo-sq">LD</div>
-        <div className="btx">
-          <div className="bn2">
-            Lawyers <span>Diary</span>
+        <img
+          src="/logo-white.png"
+          alt="DexFora"
+          className="sidebar-brand-logo"
+        />
+        <div className="sidebar-brand-icon">
+          <div className="logo-sq">
+            <img src="/favicon.png" alt="DexFora" className="logo-icon-img" />
           </div>
-          <div className="bsb">Legal Practice Mgmt</div>
         </div>
       </div>
 
@@ -273,7 +276,7 @@ export const Sidebar: React.FC = () => {
           <button
             className="blo"
             onClick={() => {
-              if (window.confirm('Sign out of Lawyers Diary?')) {
+              if (window.confirm('Sign out of DexFora?')) {
                 logout();
                 navigate('/login');
               }

@@ -19,7 +19,7 @@ const content: Record<Section, { kicker: string; title: string; description: str
   settings: {
     kicker: "Platform controls",
     title: "Platform settings",
-    description: "Keep owner policies and platform defaults ready for the firms using Lawyers Diary.",
+    description: "Keep owner policies and platform defaults ready for the firms using DexFora.",
   },
 };
 
