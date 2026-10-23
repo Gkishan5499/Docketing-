@@ -2774,7 +2774,7 @@ select {
   justify-content: space-between;
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 50;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
@@ -3008,45 +3008,55 @@ select {
 
 /* ── Mobile Navbar ────────────────────────────── */
 @media (max-width: 768px) {
-  .marketing-menu { display: flex; }
+  .marketing-menu { display: inline-flex; }
   .marketing-links {
+    display: none;
     position: absolute;
-    top: 72px;
+    top: 100%;
     left: 0;
     right: 0;
     flex-direction: column;
     align-items: stretch;
-    gap: 0;
-    padding: 0.75rem 1rem 1.25rem;
-    background: rgba(247, 245, 239, 0.97);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid rgba(32, 45, 61, 0.12);
-    box-shadow: 0 12px 28px rgba(16, 40, 62, 0.1);
-    /* hidden by default */
+    gap: 0.35rem;
+    padding: 1.25rem 1.5rem 1.5rem;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-bottom: 1px solid rgba(7, 27, 73, 0.08);
+    box-shadow: 0 20px 30px -10px rgba(7, 27, 73, 0.12);
     opacity: 0;
     pointer-events: none;
     transform: translateY(-8px);
     transition: opacity 0.22s ease, transform 0.22s ease;
   }
   .marketing-links.is-open {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: translateY(0) !important;
   }
   .marketing-links a:not(.marketing-login) {
-    padding: 0.85rem 0.75rem;
-    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
     opacity: 1;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--pr);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .marketing-links a:not(.marketing-login):hover {
+    background: rgba(0, 71, 217, 0.08);
+    color: var(--interactive);
   }
   .marketing-links a:not(.marketing-login)::after { display: none; }
   .marketing-login {
     margin-left: 0;
     margin-top: 0.5rem;
     justify-content: center;
-    padding: 0.85rem 1rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
+    padding: 0.8rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    width: 100%;
   }
 }
 
@@ -3365,7 +3375,7 @@ select {
 }
 @keyframes marketingReveal { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 @media (max-width: 900px) { .marketing-hero, .product-section, .security-section, .faq-section, .contact-section { grid-template-columns: 1fr; }.marketing-hero { padding-top: 4.5rem; }.hero-console { max-width: 650px; }.feature-grid { margin-top: 2rem; }.security-section { padding: 5rem 8vw; }.security-stamp { margin: 0; }.faq-section { padding: 5rem 8vw; }.contact-section { padding: 5rem 8vw; }.plans-grid { grid-template-columns: 1fr; max-width: 500px; }.plan-card.featured { transform: none; }.trust-strip { flex-direction: column; }.trust-strip > div { flex-wrap: wrap; gap: 1rem; } }
-@media (max-width: 640px) { .marketing-nav { height: 64px; padding: 0 1.2rem; }.marketing-menu { display: inline-flex; }.marketing-links { display: none; position: absolute; top: 64px; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 0; padding: 0.8rem 1.2rem 1.2rem; background: var(--paper); border-bottom: 1px solid var(--line); }.marketing-links.is-open { display: flex; }.marketing-links a { padding: 0.8rem 0; }.marketing-login { justify-content: center; margin-top: 0.3rem; }.marketing-hero { min-height: 0; padding: 4rem 1.2rem 4.5rem; }.hero-copy h1 { font-size: 4.4rem; }.hero-lede { font-size: 0.92rem; }.hero-actions { align-items: flex-start; flex-direction: column; gap: 1.2rem; }.hero-console { padding: 1rem; }.console-heading { margin-top: 1.8rem; }.console-heading h2 { font-size: 1.7rem; }.console-metrics strong { font-size: 1.3rem; }.console-row small { white-space: normal; }.trust-strip { padding: 1.2rem; }.marketing-section { padding: 5rem 1.2rem; }.feature-grid { grid-template-columns: 1fr; }.feature-grid article { min-height: 0; padding-bottom: 2rem; }.section-heading { align-items: flex-start; flex-direction: column; }.marketing-section h2, .security-section h2, .faq-section h2, .contact-section h2 { font-size: 3.4rem; }.security-section { padding: 4.5rem 1.2rem; }.security-points { grid-template-columns: 1fr; }.plans-grid { max-width: none; }.plan-card { padding: 1.4rem; }.faq-section { padding: 4.5rem 1.2rem; }.contact-section { padding: 4.5rem 1.2rem; }.form-row { grid-template-columns: 1fr; gap: 0; }.marketing-footer { align-items: flex-start; flex-direction: column; padding: 1.5rem 1.2rem; } }
+@media (max-width: 640px) { .marketing-nav { height: 64px; padding: 0 1.2rem; }.marketing-menu { display: inline-flex; }.marketing-hero { min-height: 0; padding: 4rem 1.2rem 4.5rem; }.hero-copy h1 { font-size: 4.4rem; }.hero-lede { font-size: 0.92rem; }.hero-actions { align-items: flex-start; flex-direction: column; gap: 1.2rem; }.hero-console { padding: 1rem; }.console-heading { margin-top: 1.8rem; }.console-heading h2 { font-size: 1.7rem; }.console-metrics strong { font-size: 1.3rem; }.console-row small { white-space: normal; }.trust-strip { padding: 1.2rem; }.marketing-section { padding: 5rem 1.2rem; }.feature-grid { grid-template-columns: 1fr; }.feature-grid article { min-height: 0; padding-bottom: 2rem; }.section-heading { align-items: flex-start; flex-direction: column; }.marketing-section h2, .security-section h2, .faq-section h2, .contact-section h2 { font-size: 3.4rem; }.security-section { padding: 4.5rem 1.2rem; }.security-points { grid-template-columns: 1fr; }.plans-grid { max-width: none; }.plan-card { padding: 1.4rem; }.faq-section { padding: 4.5rem 1.2rem; }.contact-section { padding: 4.5rem 1.2rem; }.form-row { grid-template-columns: 1fr; gap: 0; }.marketing-footer { align-items: flex-start; flex-direction: column; padding: 1.5rem 1.2rem; } }
 
 /* Responsive practice workspace */
 @media (max-width: 760px) {

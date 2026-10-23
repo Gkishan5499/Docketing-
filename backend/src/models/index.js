@@ -17,4 +17,5 @@ module.exports = {
   LegalNotice: require('./LegalNotice'),
   PaymentRecord: require('./PaymentRecord'),
   Enquiry: require('./Enquiry'),
+  Otp: require('./Otp'),
 };

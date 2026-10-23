@@ -109,10 +109,12 @@ export const LandingPage: React.FC = () => {
             <h1>Your docket.<br /><em>Under control.</em></h1>
             <p className="hero-lede">DexFora gives advocates one calm, private place to run matters, protect deadlines, and keep every client commitment visible.</p>
             <div className="hero-actions">
-              <button className="button button-primary" type="button" onClick={() => selectPlan('Chambers')}>Choose your plan <ArrowRight size={17} /></button>
+              <Link className="button button-primary" to="/register" style={{ textDecoration: 'none' }}>
+                Start 1-Month Free Trial <ArrowRight size={17} />
+              </Link>
               <a className="text-link" href="#product">See how it works <ChevronDown size={16} /></a>
             </div>
-            <div className="hero-proof"><BadgeCheck size={17} /><span>Built for Indian courts, registries, tribunals, and IP practice</span></div>
+            <div className="hero-proof"><BadgeCheck size={17} /><span>1st Month Complimentary · No credit card required · Built for Indian practice</span></div>
           </div>
           <div className="hero-console" aria-label="DexFora product preview">
             <div className="console-top"><span className="console-kicker">Today in chambers</span><span className="console-date">19 Aug 2026 <ChevronDown size={14} /></span></div>
@@ -132,7 +134,86 @@ export const LandingPage: React.FC = () => {
 
         <section className="security-section" id="security"><div className="security-stamp"><ShieldCheck size={32} /><span>Practice<br />protected</span></div><div><p className="eyebrow"><span /> Designed for confidence</p><h2>Your clients trust<br /><em>your judgement.</em></h2><p>They should be able to trust the system behind it. Keep sensitive matter information organized, access-controlled, and available to the people doing the work.</p><div className="security-points"><span><Check size={15} /> Firm-level workspaces</span><span><Check size={15} /> User roles and permissions</span><span><Check size={15} /> Secure document access</span><span><Check size={15} /> Searchable audit history</span></div></div></section>
 
-        <section className="marketing-section plans-section" id="plans"><div className="section-heading"><div><p className="eyebrow"><span /> Simple, transparent plans</p><h2>Start with the practice<br /><em>you are building.</em></h2></div><div className="billing-toggle"><button className={billing === 'monthly' ? 'active' : ''} onClick={() => setBilling('monthly')} type="button">Monthly</button><button className={billing === 'yearly' ? 'active' : ''} onClick={() => setBilling('yearly')} type="button">Yearly <small>Save 2 months</small></button></div></div><div className="plans-grid">{plans.map((plan) => <article className={`plan-card ${plan.featured ? 'featured' : ''}`} key={plan.name}>{plan.featured && <span className="plan-ribbon">Most chosen</span>}<h3>{plan.name}</h3><p>{plan.description}</p><div className="plan-price"><span>₹</span><strong>{(billing === 'monthly' ? plan.monthly : Math.round(plan.yearly / 12)).toLocaleString('en-IN')}</strong><small>/ month<br />{billing === 'yearly' ? 'billed yearly' : 'billed monthly'}</small></div><button className={plan.featured ? 'button button-primary' : 'button button-outline'} type="button" onClick={() => selectPlan(plan.name)}>Talk to us <ArrowRight size={16} /></button><ul>{plan.features.map((feature) => <li key={feature}><Check size={15} /> {feature}</li>)}</ul></article>)}</div></section>
+        <section className="marketing-section plans-section" id="plans">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow"><span /> Simple, transparent plans</p>
+              <h2>Start with the practice<br /><em>you are building.</em></h2>
+            </div>
+            <div className="billing-toggle">
+              <button className={billing === 'monthly' ? 'active' : ''} onClick={() => setBilling('monthly')} type="button">Monthly</button>
+              <button className={billing === 'yearly' ? 'active' : ''} onClick={() => setBilling('yearly')} type="button">Yearly <small>Save 2 months</small></button>
+            </div>
+          </div>
+
+          {/* 1 Month Free Trial Banner */}
+          <div
+            style={{
+              margin: '1.5rem 0',
+              padding: '1rem 1.35rem',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, rgba(0, 140, 255, 0.08) 0%, rgba(0, 217, 232, 0.12) 100%)',
+              border: '1px solid rgba(0, 140, 255, 0.28)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <strong style={{ color: '#005bb5', fontSize: '0.98rem', display: 'block' }}>
+                🎁 1st Month 100% Free for All Advocates & Chambers
+              </strong>
+              <span style={{ fontSize: '0.84rem', color: '#475569' }}>
+                Register today and enjoy 30 days of full, unrestricted access to DexFora. Zero upfront payment or credit card required.
+              </span>
+            </div>
+            <Link
+              to="/register"
+              className="button button-primary"
+              style={{ padding: '0.55rem 1.25rem', fontSize: '0.84rem', textDecoration: 'none', whiteSpace: 'nowrap' }}
+            >
+              Claim 1-Month Free <ArrowRight size={15} />
+            </Link>
+          </div>
+
+          <div className="plans-grid">
+            {plans.map((plan) => (
+              <article className={`plan-card ${plan.featured ? 'featured' : ''}`} key={plan.name}>
+                {plan.featured && <span className="plan-ribbon">Most chosen</span>}
+                <h3>{plan.name}</h3>
+                <p>{plan.description}</p>
+                <div className="plan-price">
+                  <span>₹</span>
+                  <strong>{(billing === 'monthly' ? plan.monthly : Math.round(plan.yearly / 12)).toLocaleString('en-IN')}</strong>
+                  <small>/ month<br />{billing === 'yearly' ? 'billed yearly' : 'billed monthly'}</small>
+                </div>
+                <div style={{ display: 'grid', gap: '0.5rem', width: '100%' }}>
+                  <Link
+                    to="/register"
+                    className={plan.featured ? 'button button-primary' : 'button button-outline'}
+                    style={{ textAlign: 'center', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                  >
+                    Start 30-Day Free Trial <ArrowRight size={16} />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => selectPlan(plan.name)}
+                    style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.74rem', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    or contact chambers desk
+                  </button>
+                </div>
+                <ul>
+                  {plan.features.map((feature) => (
+                    <li key={feature}><Check size={15} /> {feature}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </section>
 
         <section className="faq-section"><div><p className="eyebrow"><span /> Before you begin</p><h2>A better way to<br /><em>run the day.</em></h2></div><div className="faq-list">{faqs.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={17} /></summary><p>{answer}</p></details>)}</div></section>
 

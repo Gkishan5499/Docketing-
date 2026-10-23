@@ -15,6 +15,7 @@ import {
   User,
   Settings,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 
 const pageTitles: Record<string, string> = {
@@ -66,6 +67,7 @@ export const Topbar: React.FC = () => {
     deadlines,
     currentUser,
     currentRole,
+    trialInfo,
     logout,
   } = useLawyersDiary();
 
@@ -173,6 +175,31 @@ export const Topbar: React.FC = () => {
 
       {/* Right Controls */}
       <div className="tbr">
+        {/* Trial Status Badge */}
+        {trialInfo?.isTrial && (
+          <div
+            className="trial-badge-topbar"
+            title={`1-Month Free Services Active: ${trialInfo.daysLeft} days remaining. Renewal Date: ${new Date(trialInfo.renewalDate).toLocaleDateString()}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.22rem 0.65rem',
+              borderRadius: '9999px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              background: 'linear-gradient(135deg, rgba(0, 217, 232, 0.12), rgba(0, 140, 255, 0.16))',
+              border: '1px solid rgba(0, 140, 255, 0.35)',
+              color: '#005bb5',
+              cursor: 'default',
+              userSelect: 'none',
+            }}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-cyan-500 animate-pulse" />
+            <span>1-Month Free ({trialInfo.daysLeft}d left)</span>
+          </div>
+        )}
+
         {/* Sync Pill */}
         <div
           className={`stp ${syncStatus}`}
@@ -250,6 +277,11 @@ export const Topbar: React.FC = () => {
                     <ShieldCheck size={11} />
                     {roleLabel[currentRole] ?? currentRole}
                   </span>
+                  {trialInfo?.isTrial && (
+                    <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.2rem' }}>
+                      <Sparkles size={11} /> 1-Month Free Trial ({trialInfo.daysLeft}d left)
+                    </span>
+                  )}
                 </div>
               </div>
 

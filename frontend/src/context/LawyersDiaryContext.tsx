@@ -56,15 +56,39 @@ interface ModalState {
   payload?: any;
 }
 
+export interface TrialInfo {
+  firmName?: string;
+  plan?: string;
+  subscription?: string;
+  renewalDate?: string;
+  daysLeft?: number;
+  isTrial?: boolean;
+  isExpired?: boolean;
+}
+
 interface LawyersDiaryContextType {
   // Auth
   isLoggedIn: boolean;
   currentUser: string;
   currentEmail: string;
+  currentOrgId?: string;
+  currentUserId?: string;
   currentRole: 'FIRM_ADMIN' | 'ATTORNEY' | 'PARALEGAL' | 'STAFF' | 'VIEWER';
   mustChangePassword: boolean;
   canDeleteRecords: boolean;
+  trialInfo: TrialInfo | null;
   login: (email: string, pass: string) => Promise<boolean>;
+  sendOtp: (email: string, name?: string, purpose?: 'REGISTRATION' | 'LOGIN' | 'PASSWORD_RESET') => Promise<{ success: boolean; message: string; debugOtp?: string }>;
+  verifyOtp: (email: string, otp: string, purpose?: 'REGISTRATION' | 'LOGIN' | 'PASSWORD_RESET') => Promise<{ success: boolean; message: string }>;
+  loginWithOtp: (email: string, otp: string) => Promise<boolean>;
+  registerUser: (data: {
+    name: string;
+    email: string;
+    password: string;
+    organizationName?: string;
+    phone?: string;
+    otp: string;
+  }) => Promise<boolean>;
   loginGoogle: () => void;
   logout: () => void;
   updateProfile: (fields: { name?: string; email?: string }) => void;
@@ -179,42 +203,114 @@ interface LawyersDiaryContextType {
 
 const LawyersDiaryContext = createContext<LawyersDiaryContextType | undefined>(undefined);
 
-const STORAGE_PREFIX = 'ld_react_';
+// Purge legacy unscoped mock keys from localStorage on startup
+const LEGACY_STORAGE_KEYS = [
+  'ld_react_clients',
+  'ld_react_iprMatters',
+  'ld_react_courtMatters',
+  'ld_react_deadlines',
+  'ld_react_documents',
+  'ld_react_vaultFolders',
+  'ld_react_activities',
+  'ld_react_auditLogs',
+  'ld_react_workLogs',
+  'ld_react_notes',
+  'ld_react_legalNotices',
+];
 
-const loadFromStorage = <T,>(key: string, fallback: T): T => {
+if (typeof window !== 'undefined') {
   try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + key);
+    for (const key of LEGACY_STORAGE_KEYS) {
+      localStorage.removeItem(key);
+    }
+    if (window.indexedDB && !sessionStorage.getItem('ld_vault_reset_done')) {
+      window.indexedDB.deleteDatabase('LawyersDiaryVault');
+      sessionStorage.setItem('ld_vault_reset_done', 'true');
+    }
+  } catch {}
+}
+
+const defaultFreshVaultFolders: VaultFolder[] = [
+  { id: 'vf_root', name: 'LawyersDiary', path: '/LawyersDiary', parentPath: '', isSystem: true },
+  { id: 'vf_clients', name: 'Clients', path: '/LawyersDiary/Clients', parentPath: '/LawyersDiary', isSystem: true },
+  { id: 'vf_pleadings', name: 'Pleadings', path: '/LawyersDiary/Pleadings', parentPath: '/LawyersDiary', isSystem: true },
+  { id: 'vf_orders', name: 'Orders', path: '/LawyersDiary/Orders', parentPath: '/LawyersDiary', isSystem: true },
+  { id: 'vf_evidence', name: 'Evidence', path: '/LawyersDiary/Evidence', parentPath: '/LawyersDiary', isSystem: true },
+  { id: 'vf_templates', name: 'Templates & Drafts', path: '/LawyersDiary/Templates & Drafts', parentPath: '/LawyersDiary', isSystem: true },
+];
+
+export const computeUserScope = (orgId?: string, email?: string, uid?: string): string => {
+  if (orgId && String(orgId).trim()) return `org_${String(orgId).trim()}`;
+  if (uid && String(uid).trim()) return `usr_${String(uid).trim()}`;
+  if (email && String(email).trim()) return `email_${String(email).trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+  return 'fresh';
+};
+
+const AUTH_PREFIX = 'ld_auth_';
+
+const loadAuthStorage = <T,>(key: string, fallback: T): T => {
+  try {
+    const raw = localStorage.getItem(AUTH_PREFIX + key) ?? localStorage.getItem('ld_react_' + key);
     if (raw) return JSON.parse(raw);
   } catch (e) {
-    console.error(`Failed to load ${key} from localStorage`, e);
+    console.error(`Failed to load ${key} from auth storage`, e);
   }
   return fallback;
 };
 
-const saveToStorage = <T,>(key: string, value: T): void => {
+const saveAuthStorage = <T,>(key: string, value: T): void => {
   try {
-    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+    localStorage.setItem(AUTH_PREFIX + key, JSON.stringify(value));
   } catch (e) {
-    console.error(`Failed to save ${key} to localStorage`, e);
+    console.error(`Failed to save ${key} to auth storage`, e);
+  }
+};
+
+const loadTenantStorage = <T,>(scope: string, key: string, fallback: T): T => {
+  if (!scope || scope === 'fresh') return fallback;
+  try {
+    const raw = localStorage.getItem(`ld_scope_${scope}_${key}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error(`Failed to load ${key} for scope ${scope}`, e);
+  }
+  return fallback;
+};
+
+const saveTenantStorage = <T,>(scope: string, key: string, value: T): void => {
+  if (!scope || scope === 'fresh') return;
+  try {
+    localStorage.setItem(`ld_scope_${scope}_${key}`, JSON.stringify(value));
+  } catch (e) {
+    console.error(`Failed to save ${key} for scope ${scope}`, e);
   }
 };
 
 export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Auth state
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() =>
-    loadFromStorage('isLoggedIn', false)
+    loadAuthStorage('isLoggedIn', false)
   );
   const [currentUser, setCurrentUser] = useState<string>(() =>
-    loadFromStorage('currentUser', '')
+    loadAuthStorage('currentUser', '')
   );
   const [currentEmail, setCurrentEmail] = useState<string>(() =>
-    loadFromStorage('currentEmail', '')
+    loadAuthStorage('currentEmail', '')
+  );
+  const [currentOrgId, setCurrentOrgId] = useState<string>(() =>
+    loadAuthStorage('currentOrgId', '')
+  );
+  const [currentUserId, setCurrentUserId] = useState<string>(() =>
+    loadAuthStorage('currentUserId', '')
   );
   const [currentRole, setCurrentRole] = useState<'FIRM_ADMIN' | 'ATTORNEY' | 'PARALEGAL' | 'STAFF' | 'VIEWER'>(() =>
-    loadFromStorage('currentRole', 'ATTORNEY')
+    loadAuthStorage('currentRole', 'ATTORNEY')
   );
   const [mustChangePassword, setMustChangePassword] = useState<boolean>(() =>
-    loadFromStorage('mustChangePassword', false)
+    loadAuthStorage('mustChangePassword', false)
+  );
+  const [trialInfo, setTrialInfo] = useState<TrialInfo | null>(() =>
+    loadAuthStorage('trialInfo', null)
   );
   const canDeleteRecords = currentRole === 'FIRM_ADMIN' || currentRole === 'ATTORNEY';
 
@@ -225,16 +321,16 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isNotifPanelOpen, setIsNotifPanelOpen] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing'>('synced');
   const [googleCalendarEmail, setGoogleCalendarEmailState] = useState<string>(() =>
-    loadFromStorage('googleCalendarEmail', '')
+    loadAuthStorage('googleCalendarEmail', '')
   );
   const [googleCalendarSync, setGoogleCalendarSync] = useState<boolean>(() =>
-    loadFromStorage('googleCalendarSync', false)
+    loadAuthStorage('googleCalendarSync', false)
   );
   const [googleCalendarScope, setGoogleCalendarScope] = useState<'all' | 'assigned'>(() =>
-    loadFromStorage('googleCalendarScope', 'all')
+    loadAuthStorage('googleCalendarScope', 'all')
   );
   const [calendarToken, setCalendarToken] = useState<string>(() =>
-    loadFromStorage('calendarToken', '')
+    loadAuthStorage('calendarToken', '')
   );
 
   // Modals state
@@ -243,52 +339,163 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Toasts state
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Entities
+  // Compute initial scope from stored auth
+  const initialScope = loadAuthStorage('isLoggedIn', false)
+    ? computeUserScope(
+        loadAuthStorage('currentOrgId', ''),
+        loadAuthStorage('currentEmail', ''),
+        loadAuthStorage('currentUserId', '')
+      )
+    : 'fresh';
+
+  // Entities - fresh empty slate for new users / tenants
   const [clients, setClients] = useState<Client[]>(() =>
-    loadFromStorage('clients', initialClients)
+    loadTenantStorage(initialScope, 'clients', [])
   );
   const [iprMatters, setIprMatters] = useState<IprMatter[]>(() =>
-    loadFromStorage('iprMatters', initialIprMatters)
+    loadTenantStorage(initialScope, 'iprMatters', [])
   );
   const [courtMatters, setCourtMatters] = useState<CourtMatter[]>(() =>
-    loadFromStorage('courtMatters', initialCourtMatters)
+    loadTenantStorage(initialScope, 'courtMatters', [])
   );
   const [deadlines, setDeadlines] = useState<DocketEvent[]>(() =>
-    loadFromStorage('deadlines', initialDeadlines)
+    loadTenantStorage(initialScope, 'deadlines', [])
   );
   const [documents, setDocuments] = useState<DocumentFile[]>(() =>
-    loadFromStorage('documents', initialDocuments)
+    loadTenantStorage(initialScope, 'documents', [])
   );
   const [vaultFolders, setVaultFolders] = useState<VaultFolder[]>(() =>
-    loadFromStorage('vaultFolders', initialVaultFolders)
+    loadTenantStorage(initialScope, 'vaultFolders', defaultFreshVaultFolders)
   );
   const [activities, setActivities] = useState<ActivityItem[]>(() =>
-    loadFromStorage('activities', initialActivities)
+    loadTenantStorage(initialScope, 'activities', [])
   );
   const [auditLogs, setAuditLogs] = useState<AuditHistoryItem[]>(() =>
-    loadFromStorage('auditLogs', initialAuditLogs)
+    loadTenantStorage(initialScope, 'auditLogs', [])
   );
   const [workLogs, setWorkLogs] = useState<WorkLogEntry[]>(() =>
-    loadFromStorage('workLogs', initialWorkLogs)
+    loadTenantStorage(initialScope, 'workLogs', [])
   );
   const [notes, setNotes] = useState<NoteItem[]>(() =>
-    loadFromStorage('notes', initialNotes)
+    loadTenantStorage(initialScope, 'notes', [])
   );
   const [legalNotices, setLegalNotices] = useState<LegalNotice[]>(() =>
-    loadFromStorage('legalNotices', initialLegalNotices)
+    loadTenantStorage(initialScope, 'legalNotices', [])
   );
 
-  // Sync to localStorage
-  useEffect(() => saveToStorage('isLoggedIn', isLoggedIn), [isLoggedIn]);
-  useEffect(() => saveToStorage('currentUser', currentUser), [currentUser]);
-  useEffect(() => saveToStorage('currentEmail', currentEmail), [currentEmail]);
-  useEffect(() => saveToStorage('currentRole', currentRole), [currentRole]);
-  useEffect(() => saveToStorage('mustChangePassword', mustChangePassword), [mustChangePassword]);
-  useEffect(() => saveToStorage('legalNotices', legalNotices), [legalNotices]);
-  useEffect(() => saveToStorage('googleCalendarEmail', googleCalendarEmail), [googleCalendarEmail]);
-  useEffect(() => saveToStorage('googleCalendarSync', googleCalendarSync), [googleCalendarSync]);
-  useEffect(() => saveToStorage('googleCalendarScope', googleCalendarScope), [googleCalendarScope]);
-  useEffect(() => saveToStorage('calendarToken', calendarToken), [calendarToken]);
+  // Switch workspace state when logging in or logging out
+  const switchUserWorkspace = useCallback((orgId?: string, email?: string, uid?: string) => {
+    const scope = computeUserScope(orgId, email, uid);
+    if (!scope || scope === 'fresh') {
+      setClients([]);
+      setIprMatters([]);
+      setCourtMatters([]);
+      setDeadlines([]);
+      setDocuments([]);
+      setVaultFolders(defaultFreshVaultFolders);
+      setActivities([]);
+      setAuditLogs([]);
+      setWorkLogs([]);
+      setNotes([]);
+      setLegalNotices([]);
+      return;
+    }
+    setClients(loadTenantStorage(scope, 'clients', []));
+    setIprMatters(loadTenantStorage(scope, 'iprMatters', []));
+    setCourtMatters(loadTenantStorage(scope, 'courtMatters', []));
+    setDeadlines(loadTenantStorage(scope, 'deadlines', []));
+    setDocuments(loadTenantStorage(scope, 'documents', []));
+    setVaultFolders(loadTenantStorage(scope, 'vaultFolders', defaultFreshVaultFolders));
+    setActivities(loadTenantStorage(scope, 'activities', []));
+    setAuditLogs(loadTenantStorage(scope, 'auditLogs', []));
+    setWorkLogs(loadTenantStorage(scope, 'workLogs', []));
+    setNotes(loadTenantStorage(scope, 'notes', []));
+    setLegalNotices(loadTenantStorage(scope, 'legalNotices', []));
+  }, []);
+
+  // Sync auth to localStorage
+  useEffect(() => saveAuthStorage('isLoggedIn', isLoggedIn), [isLoggedIn]);
+  useEffect(() => saveAuthStorage('currentUser', currentUser), [currentUser]);
+  useEffect(() => saveAuthStorage('currentEmail', currentEmail), [currentEmail]);
+  useEffect(() => saveAuthStorage('currentOrgId', currentOrgId), [currentOrgId]);
+  useEffect(() => saveAuthStorage('currentUserId', currentUserId), [currentUserId]);
+  useEffect(() => saveAuthStorage('currentRole', currentRole), [currentRole]);
+  useEffect(() => saveAuthStorage('mustChangePassword', mustChangePassword), [mustChangePassword]);
+  useEffect(() => saveAuthStorage('googleCalendarEmail', googleCalendarEmail), [googleCalendarEmail]);
+  useEffect(() => saveAuthStorage('googleCalendarSync', googleCalendarSync), [googleCalendarSync]);
+  useEffect(() => saveAuthStorage('googleCalendarScope', googleCalendarScope), [googleCalendarScope]);
+  useEffect(() => saveAuthStorage('calendarToken', calendarToken), [calendarToken]);
+  useEffect(() => saveAuthStorage('trialInfo', trialInfo), [trialInfo]);
+
+  // Sync tenant data to localStorage (ONLY for active logged-in scope, ensuring data isolation)
+  const activeScope = isLoggedIn ? computeUserScope(currentOrgId, currentEmail, currentUserId) : 'fresh';
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'clients', clients);
+    }
+  }, [clients, activeScope]);
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'iprMatters', iprMatters);
+    }
+  }, [iprMatters, activeScope]);
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'courtMatters', courtMatters);
+    }
+  }, [courtMatters, activeScope]);
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'deadlines', deadlines);
+    }
+  }, [deadlines, activeScope]);
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'documents', documents);
+    }
+  }, [documents, activeScope]);
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'vaultFolders', vaultFolders);
+    }
+  }, [vaultFolders, activeScope]);
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'activities', activities);
+    }
+  }, [activities, activeScope]);
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'auditLogs', auditLogs);
+    }
+  }, [auditLogs, activeScope]);
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'workLogs', workLogs);
+    }
+  }, [workLogs, activeScope]);
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'notes', notes);
+    }
+  }, [notes, activeScope]);
+
+  useEffect(() => {
+    if (activeScope && activeScope !== 'fresh') {
+      saveTenantStorage(activeScope, 'legalNotices', legalNotices);
+    }
+  }, [legalNotices, activeScope]);
+
   useEffect(() => {
     let isCancelled = false;
 
@@ -322,11 +529,18 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
             setIsLoggedIn(false);
             setCurrentUser('');
             setCurrentEmail('');
+            setCurrentOrgId('');
+            setCurrentUserId('');
             setCurrentRole('ATTORNEY');
+            switchUserWorkspace();
             return;
           }
+          const orgId = user.organizationId ? String(user.organizationId) : '';
+          const uid = user.id || user._id ? String(user.id || user._id) : '';
           setCurrentUser(user.name);
           if (user.email) setCurrentEmail(user.email);
+          setCurrentOrgId(orgId);
+          setCurrentUserId(uid);
           setCurrentRole(user.role);
           if (user.mustChangePassword !== undefined) {
             setMustChangePassword(Boolean(user.mustChangePassword));
@@ -342,17 +556,30 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
           if (user.calendarToken) {
             setCalendarToken(user.calendarToken);
           }
+          if (user.trial) {
+            setTrialInfo(user.trial);
+          }
+          switchUserWorkspace(orgId, user.email, uid);
           setIsLoggedIn(true);
         } else if (response.status === 401 || response.status === 403) {
           // Confirmed unauthenticated session by server
           setIsLoggedIn(false);
           setCurrentUser('');
+          setCurrentEmail('');
+          setCurrentOrgId('');
+          setCurrentUserId('');
           setCurrentRole('ATTORNEY');
           setMustChangePassword(false);
-          localStorage.removeItem(`${STORAGE_PREFIX}isLoggedIn`);
-          localStorage.removeItem(`${STORAGE_PREFIX}currentUser`);
-          localStorage.removeItem(`${STORAGE_PREFIX}currentRole`);
-          localStorage.removeItem(`${STORAGE_PREFIX}mustChangePassword`);
+          setTrialInfo(null);
+          localStorage.removeItem('ld_auth_isLoggedIn');
+          localStorage.removeItem('ld_auth_currentUser');
+          localStorage.removeItem('ld_auth_currentEmail');
+          localStorage.removeItem('ld_auth_currentOrgId');
+          localStorage.removeItem('ld_auth_currentUserId');
+          localStorage.removeItem('ld_auth_currentRole');
+          localStorage.removeItem('ld_auth_mustChangePassword');
+          localStorage.removeItem('ld_auth_trialInfo');
+          switchUserWorkspace();
         }
       } catch (err: any) {
         // Network error, request aborted during navigation/rapid refresh, or offline:
@@ -367,7 +594,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [switchUserWorkspace]);
 
   // Periodic background session renewal (every 30 minutes) to maintain 1-day active session
   useEffect(() => {
@@ -385,16 +612,6 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, [isLoggedIn]);
-  useEffect(() => saveToStorage('clients', clients), [clients]);
-  useEffect(() => saveToStorage('iprMatters', iprMatters), [iprMatters]);
-  useEffect(() => saveToStorage('courtMatters', courtMatters), [courtMatters]);
-  useEffect(() => saveToStorage('deadlines', deadlines), [deadlines]);
-  useEffect(() => saveToStorage('documents', documents), [documents]);
-  useEffect(() => saveToStorage('vaultFolders', vaultFolders), [vaultFolders]);
-  useEffect(() => saveToStorage('activities', activities), [activities]);
-  useEffect(() => saveToStorage('auditLogs', auditLogs), [auditLogs]);
-  useEffect(() => saveToStorage('workLogs', workLogs), [workLogs]);
-  useEffect(() => saveToStorage('notes', notes), [notes]);
 
   // Synchronize real uploaded files from backend into documents state
   useEffect(() => {
@@ -428,28 +645,17 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }));
 
         setDocuments((prev) => {
-          const map = new Map<string, DocumentFile>();
-          prev.forEach((d) => map.set(d.name, d));
-          backendDocs.forEach((bd) => {
-            const existing = map.get(bd.name);
-            if (existing) {
-              map.set(bd.name, {
-                ...existing,
-                ...bd,
-                folder: existing.folder || bd.folder,
-              });
-            } else {
-              map.set(bd.name, bd);
-            }
-          });
-          return Array.from(map.values());
+          const localOnly = prev.filter((d) => !d.isUploaded && !d.backendId);
+          return [...backendDocs, ...localOnly];
         });
       } catch {
         // Ignore network failure
       }
     };
 
-    fetchBackendDocuments();
+    if (isLoggedIn) {
+      fetchBackendDocuments();
+    }
     return () => {
       mounted = false;
     };
@@ -503,8 +709,12 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
           throw new Error('This account belongs to the platform owner. Please sign in via the Owner Portal at /owner/login.');
         }
         const needsPasswordChange = Boolean(result.data.mustChangePassword || user.mustChangePassword);
+        const orgId = user.organizationId ? String(user.organizationId) : '';
+        const uid = user.id || user._id ? String(user.id || user._id) : '';
         setCurrentUser(user.name);
         if (user.email) setCurrentEmail(user.email);
+        setCurrentOrgId(orgId);
+        setCurrentUserId(uid);
         setCurrentRole(user.role);
         setMustChangePassword(needsPasswordChange);
         if (user.googleCalendarEmail) {
@@ -518,6 +728,10 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
         if (user.calendarToken) {
           setCalendarToken(user.calendarToken);
         }
+        if (user.trial) {
+          setTrialInfo(user.trial);
+        }
+        switchUserWorkspace(orgId, user.email, uid);
         setIsLoggedIn(true);
         audit('LOGIN', 'System', `User ${user.name} logged in`);
         if (needsPasswordChange) {
@@ -531,36 +745,187 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return false;
       }
     },
-    [audit, showToast]
+    [audit, showToast, switchUserWorkspace]
+  );
+
+  const sendOtp = useCallback(
+    async (
+      email: string,
+      name?: string,
+      purpose: 'REGISTRATION' | 'LOGIN' | 'PASSWORD_RESET' = 'REGISTRATION'
+    ): Promise<{ success: boolean; message: string; debugOtp?: string }> => {
+      try {
+        const response = await fetch('/api/v1/auth/send-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim().toLowerCase(), name, purpose }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to dispatch verification code');
+        }
+        showToast('6-Digit verification code dispatched to your email!', 'ok');
+        return {
+          success: true,
+          message: result.message || 'Verification code sent.',
+          debugOtp: result.data?.debugOtp,
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unable to send verification code';
+        showToast(msg, 'er');
+        return { success: false, message: msg };
+      }
+    },
+    [showToast]
+  );
+
+  const verifyOtp = useCallback(
+    async (
+      email: string,
+      otp: string,
+      purpose: 'REGISTRATION' | 'LOGIN' | 'PASSWORD_RESET' = 'REGISTRATION'
+    ): Promise<{ success: boolean; message: string }> => {
+      try {
+        const response = await fetch('/api/v1/auth/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim(), purpose }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || 'Invalid verification code');
+        }
+        return { success: true, message: result.message || 'Verified' };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Invalid verification code';
+        return { success: false, message: msg };
+      }
+    },
+    []
+  );
+
+  const loginWithOtp = useCallback(
+    async (email: string, otp: string): Promise<boolean> => {
+      try {
+        const response = await fetch('/api/v1/auth/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim(), purpose: 'LOGIN' }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.data?.user) {
+          throw new Error(result.message || 'Invalid verification code');
+        }
+        const user = result.data.user;
+        const orgId = user.organizationId ? String(user.organizationId) : '';
+        const uid = user.id || user._id ? String(user.id || user._id) : '';
+        setCurrentUser(user.name);
+        if (user.email) setCurrentEmail(user.email);
+        setCurrentOrgId(orgId);
+        setCurrentUserId(uid);
+        setCurrentRole(user.role);
+        setMustChangePassword(Boolean(user.mustChangePassword));
+        if (user.trial) setTrialInfo(user.trial);
+        switchUserWorkspace(orgId, user.email, uid);
+        setIsLoggedIn(true);
+        audit('LOGIN', 'System', `Advocate ${user.name} logged in via Email OTP`);
+        showToast(`Welcome back, ${user.name.split(' ')[0]}!`, 'ok');
+        return true;
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Unable to sign in with OTP', 'er');
+        return false;
+      }
+    },
+    [audit, showToast, switchUserWorkspace]
+  );
+
+  const registerUser = useCallback(
+    async (formData: {
+      name: string;
+      email: string;
+      password: string;
+      organizationName?: string;
+      phone?: string;
+      otp: string;
+    }): Promise<boolean> => {
+      try {
+        const response = await fetch('/api/v1/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(formData),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.data?.user) {
+          throw new Error(result.message || 'Registration failed');
+        }
+        const user = result.data.user;
+        const orgId = user.organizationId ? String(user.organizationId) : '';
+        const uid = user.id || user._id ? String(user.id || user._id) : '';
+        setCurrentUser(user.name);
+        if (user.email) setCurrentEmail(user.email);
+        setCurrentOrgId(orgId);
+        setCurrentUserId(uid);
+        setCurrentRole(user.role || 'FIRM_ADMIN');
+        setMustChangePassword(false);
+        if (user.trial) setTrialInfo(user.trial);
+        if (user.googleCalendarEmail) setGoogleCalendarEmailState(user.googleCalendarEmail);
+        if (user.googleCalendarSync !== undefined) setGoogleCalendarSync(Boolean(user.googleCalendarSync));
+        if (user.calendarToken) setCalendarToken(user.calendarToken);
+        switchUserWorkspace(orgId, user.email, uid);
+        setIsLoggedIn(true);
+        audit('LOGIN', 'System', `New advocate ${user.name} registered for 1-Month Free Trial`);
+        showToast(`Welcome, ${user.name.split(' ')[0]}! Your 1-Month Free Trial is active.`, 'ok');
+        return true;
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Registration failed', 'er');
+        return false;
+      }
+    },
+    [audit, showToast, switchUserWorkspace]
   );
 
   const loginGoogle = useCallback(() => {
     showToast('Connecting with Google OAuth…', 'in');
     setTimeout(() => {
       const username = 'Partner Advocate';
+      const email = 'partner.advocate@gmail.com';
+      const orgId = 'google_demo_firm';
       setCurrentUser(username);
+      setCurrentEmail(email);
+      setCurrentOrgId(orgId);
       setCurrentRole('ATTORNEY');
+      switchUserWorkspace(orgId, email);
       setIsLoggedIn(true);
       audit('LOGIN', 'System', `User signed in with Google`);
       showToast(`Welcome back, ${username}!`, 'ok');
     }, 800);
-  }, [audit, showToast]);
+  }, [audit, showToast, switchUserWorkspace]);
 
   const logout = useCallback(() => {
     fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     setIsLoggedIn(false);
     setCurrentUser('');
     setCurrentEmail('');
+    setCurrentOrgId('');
+    setCurrentUserId('');
     setCurrentRole('ATTORNEY');
     setMustChangePassword(false);
-    localStorage.removeItem(`${STORAGE_PREFIX}isLoggedIn`);
-    localStorage.removeItem(`${STORAGE_PREFIX}currentUser`);
-    localStorage.removeItem(`${STORAGE_PREFIX}currentEmail`);
-    localStorage.removeItem(`${STORAGE_PREFIX}currentRole`);
-    localStorage.removeItem(`${STORAGE_PREFIX}mustChangePassword`);
+    setTrialInfo(null);
+    localStorage.removeItem('ld_auth_isLoggedIn');
+    localStorage.removeItem('ld_auth_currentUser');
+    localStorage.removeItem('ld_auth_currentEmail');
+    localStorage.removeItem('ld_auth_currentOrgId');
+    localStorage.removeItem('ld_auth_currentUserId');
+    localStorage.removeItem('ld_auth_currentRole');
+    localStorage.removeItem('ld_auth_mustChangePassword');
+    localStorage.removeItem('ld_auth_trialInfo');
     sessionStorage.removeItem('ld_owner_portal');
+    switchUserWorkspace();
     showToast('Signed out successfully', 'in');
-  }, [showToast]);
+  }, [showToast, switchUserWorkspace]);
 
   const completePasswordSetup = useCallback(
     async (currentPassword: string, newPassword: string): Promise<boolean> => {
@@ -1436,10 +1801,17 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       isLoggedIn,
       currentUser,
       currentEmail,
+      currentOrgId,
+      currentUserId,
       currentRole,
       mustChangePassword,
       canDeleteRecords,
+      trialInfo,
       login,
+      sendOtp,
+      verifyOtp,
+      loginWithOtp,
+      registerUser,
       loginGoogle,
       logout,
       updateProfile,
@@ -1507,10 +1879,17 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       isLoggedIn,
       currentUser,
       currentEmail,
+      currentOrgId,
+      currentUserId,
       currentRole,
       mustChangePassword,
       canDeleteRecords,
+      trialInfo,
       login,
+      sendOtp,
+      verifyOtp,
+      loginWithOtp,
+      registerUser,
       loginGoogle,
       logout,
       updateProfile,

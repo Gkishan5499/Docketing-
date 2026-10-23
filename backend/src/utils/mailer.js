@@ -527,10 +527,124 @@ https://dexfora.com`;
   }
 }
 
+/**
+ * Send Verification OTP Email
+ */
+async function sendVerificationOtpEmail({ to, name, otp, purpose = 'REGISTRATION' }) {
+  const transporter = getTransporter();
+  const advocateName = name || 'Advocate';
+
+  const actionText =
+    purpose === 'LOGIN'
+      ? 'sign in to your DexFora chambers workspace'
+      : purpose === 'PASSWORD_RESET'
+        ? 'reset your DexFora password'
+        : 'activate your 1-Month Free Trial on DexFora';
+
+  const subject = `DexFora — Verification Code: ${otp}`;
+
+  const textContent = `Hello ${advocateName},
+
+Your one-time verification code to ${actionText} is:
+
+${otp}
+
+This code is valid for 10 minutes. Please enter it in the verification screen.
+
+If you did not request this verification code, please ignore this email or reach us at dexforaofficial@gmail.com.
+
+DexFora Practice Management
+https://dexfora.com`;
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #07132b; margin: 0; padding: 32px 16px; }
+    .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+    .header { background: linear-gradient(135deg, #071B49 0%, #030d24 100%); padding: 32px; text-align: center; border-bottom: 2px solid #00D9E8; }
+    .logo { height: 38px; width: auto; }
+    .content { padding: 36px 32px; color: #1e293b; line-height: 1.6; }
+    .otp-box { background: #f8fafc; border: 2px dashed #008CFF; border-radius: 12px; padding: 24px; text-align: center; margin: 26px 0; }
+    .otp-code { font-family: 'SF Pro Display', Consolas, Menlo, monospace; font-size: 38px; font-weight: 800; letter-spacing: 10px; color: #0047D9; margin: 6px 0; }
+    .trial-callout { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin: 20px 0; font-size: 13px; color: #166534; }
+    .footer { background: #f8fafc; padding: 20px 32px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="cid:dexfora-logo-white" alt="DexFora" class="logo" />
+      <div style="margin-top: 8px; color: #93c5fd; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700;">
+        Email Verification
+      </div>
+    </div>
+    <div class="content">
+      <h2 style="margin: 0 0 12px; color: #0f172a; font-size: 22px; font-weight: 800;">Verify your email address</h2>
+      <p style="margin: 0 0 16px; color: #475569; font-size: 15px;">
+        Hello <strong>${advocateName}</strong>, use the one-time verification code below to ${actionText}:
+      </p>
+
+      <div class="otp-box">
+        <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">
+          One-Time Verification Code
+        </div>
+        <div class="otp-code">${otp}</div>
+        <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
+          ⏱️ Valid for <strong>10 minutes</strong>. Do not share this code.
+        </div>
+      </div>
+
+      <div class="trial-callout">
+        🎁 <strong>1-Month Free Trial:</strong> Your 30 days of complimentary chambers management will be immediately activated upon verification.
+      </div>
+
+      <p style="margin: 20px 0 0; font-size: 13px; color: #64748b;">
+        If you did not request this verification code, you can safely ignore this email. No changes will be made without it.
+      </p>
+    </div>
+    <div class="footer">
+      DexFora Practice Management · Cloud-encrypted legal workspace<br />
+      Need assistance? Contact our chambers desk at <a href="mailto:dexforaofficial@gmail.com" style="color: #008CFF;">dexforaofficial@gmail.com</a>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  if (!transporter) {
+    console.log(`[SMTP Not Configured] Verification OTP for ${to}: ${otp}`);
+    return { sent: false, error: 'SMTP transporter not configured', otp };
+  }
+
+  try {
+    const logoAttachment = getLogoWhiteAttachment();
+    const attachments = logoAttachment ? [logoAttachment] : [];
+
+    const info = await transporter.sendMail({
+      from: env.smtp.from,
+      to,
+      subject,
+      text: textContent,
+      html: htmlContent,
+      attachments,
+    });
+    console.log(`[Verification OTP Sent] MessageId: ${info.messageId} to: ${to}`);
+    return { sent: true, messageId: info.messageId };
+  } catch (error) {
+    console.error(`[Verification OTP Error] Failed to send email to ${to}:`, error.message);
+    return { sent: false, error: error.message };
+  }
+}
+
 module.exports = {
   verifySmtp,
   sendSubscriptionWelcomeEmail,
   sendTeamInviteEmail,
   sendEnquiryNotificationEmail,
   sendEnquiryConfirmationToUser,
+  sendVerificationOtpEmail,
 };
+

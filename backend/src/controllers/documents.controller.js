@@ -166,19 +166,26 @@ async function remove(req, res, next) {
     const param = decodeURIComponent(req.params.id || '');
     let doc = null;
     if (mongoose.isValidObjectId(param)) {
-      doc = await Document.findOneAndUpdate(
-        { _id: param, organizationId: req.organizationId },
-        { isArchived: true },
-        { new: true }
-      );
+      doc = await Document.findOneAndDelete({ _id: param, organizationId: req.organizationId });
     }
     if (!doc) {
-      doc = await Document.findOneAndUpdate(
-        { organizationId: req.organizationId, $or: [{ name: param }, { storageKey: param }] },
-        { isArchived: true },
-        { new: true }
-      );
+      doc = await Document.findOneAndDelete({
+        organizationId: req.organizationId,
+        $or: [{ name: param }, { storageKey: param }, { originalName: param }],
+      });
     }
+
+    if (doc && doc.storageKey) {
+      const filePath = path.join(env.uploadDir, path.basename(doc.storageKey));
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (err) {
+          console.warn('Failed to delete physical file from disk:', err.message);
+        }
+      }
+    }
+
     ok(res, doc, 'Document removed successfully');
   } catch (error) {
     next(error);
