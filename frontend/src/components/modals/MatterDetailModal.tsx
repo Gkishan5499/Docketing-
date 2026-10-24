@@ -25,6 +25,7 @@ import {
   ExternalLink,
   ChevronDown,
   Folder,
+  Award,
 } from 'lucide-react';
 
 export const MatterDetailModal: React.FC = () => {
@@ -44,6 +45,7 @@ export const MatterDetailModal: React.FC = () => {
     uploadDocuments,
     deleteDocument,
     deleteIprMatter,
+    updateIprMatter,
     deleteCourtMatter,
     canDeleteRecords,
     showToast,
@@ -240,7 +242,128 @@ export const MatterDetailModal: React.FC = () => {
                     {matter.priority === 'h' ? 'High Priority' : 'Normal Priority'}
                   </span>
                 )}
+                {isIpr && (matter as IprMatter).typeOfMark && (
+                  <span className="chip" style={{ fontWeight: 600 }}>
+                    {(matter as IprMatter).typeOfMark}
+                  </span>
+                )}
               </div>
+
+              {isIpr && (
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '0.85rem',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '6px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      padding: '3px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    {(matter as IprMatter).markImage ? (
+                      <img
+                        src={(matter as IprMatter).markImage}
+                        alt={(matter as IprMatter).mark}
+                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                      />
+                    ) : (
+                      <Award className="w-7 h-7 text-amber-700/50" />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                        {(matter as IprMatter).mark}
+                      </span>
+                      {(matter as IprMatter).typeOfMark && (
+                        <span
+                          style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 600,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            background: '#e0e7ff',
+                            color: '#3730a3',
+                          }}
+                        >
+                          {(matter as IprMatter).typeOfMark}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
+                      {(matter as IprMatter).markFileName ? (
+                        <span>Specimen: <strong>{(matter as IprMatter).markFileName}</strong></span>
+                      ) : (matter as IprMatter).markImage ? (
+                        <span>Mark representation loaded</span>
+                      ) : (
+                        <span style={{ fontStyle: 'italic' }}>No mark image / representation uploaded yet</span>
+                      )}
+                    </div>
+                    <div style={{ marginTop: '0.4rem' }}>
+                      <label
+                        style={{
+                          fontSize: '0.72rem',
+                          color: '#4f46e5',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        <UploadCloud size={13} />
+                        {(matter as IprMatter).markImage ? 'Change Mark Representation' : 'Upload Mark Representation'}
+                        <input
+                          type="file"
+                          accept=".png,.jpg,.jpeg,.svg,.webp,.pdf"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const dest = selectedVaultFolder || matterRootPath;
+                              uploadDocuments([file], dest, matter.id, [(matter as IprMatter).type, 'Representation']);
+                              if (file.type.startsWith('image/')) {
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  updateIprMatter(matter.id, {
+                                    markImage: ev.target?.result as string,
+                                    markFileName: file.name,
+                                  });
+                                };
+                                reader.readAsDataURL(file);
+                              } else {
+                                updateIprMatter(matter.id, {
+                                  markFileName: file.name,
+                                });
+                              }
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>

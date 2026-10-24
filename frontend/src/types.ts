@@ -43,6 +43,9 @@ export interface IprMatter {
   clientName: string;
   appNo: string;
   mark: string;
+  typeOfMark?: string;
+  markImage?: string;
+  markFileName?: string;
   classes?: string;
   inventors?: string;
   nature?: string;

@@ -13,7 +13,7 @@ const controllers = {
 };
 
 const matterFields = [
-  'type', 'clientId', 'clientName', 'appNo', 'mark', 'classes', 'inventors',
+  'type', 'clientId', 'clientName', 'appNo', 'mark', 'typeOfMark', 'markImage', 'markFileName', 'classes', 'inventors',
   'nature', 'designClass', 'goods', 'area', 'caseNo', 'caseTitle', 'court',
   'courtNo', 'judgeName', 'vcLink',
   'bench', 'filingDate', 'nextDate', 'status', 'stage', 'priority', 'attorney',

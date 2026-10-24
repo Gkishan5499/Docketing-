@@ -140,7 +140,8 @@ interface LawyersDiaryContextType {
   addClient: (client: Omit<Client, 'id' | 'created'>) => void;
   deleteClient: (id: string) => void;
 
-  addIprMatter: (matter: Omit<IprMatter, 'id' | 'created' | 'statusHistory'>) => void;
+  addIprMatter: (matter: Omit<IprMatter, 'id' | 'created' | 'statusHistory'>, attachedFiles?: File[]) => IprMatter;
+  updateIprMatter: (id: string, updates: Partial<IprMatter>) => void;
   deleteIprMatter: (id: string) => void;
 
   addCourtMatter: (matter: Omit<CourtMatter, 'id' | 'created' | 'statusHistory'>) => void;
@@ -1113,175 +1114,6 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [audit, canDeleteRecords, clients, showToast]
   );
 
-  // IPR Matter actions
-  const addIprMatter = useCallback(
-    (matterData: Omit<IprMatter, 'id' | 'created' | 'statusHistory'>) => {
-      const filingDate = matterData.filingDate || new Date().toISOString().split('T')[0];
-      const newMatter: IprMatter = {
-        ...matterData,
-        id: gid('m'),
-        created: new Date().toISOString().split('T')[0],
-        statusHistory: [
-          {
-            status: matterData.status || 'Pending',
-            date: filingDate,
-            note: 'Matter created',
-          },
-        ],
-      };
-      setIprMatters((prev) => [...prev, newMatter]);
-
-      if (newMatter.nextDate) {
-        const newDeadline: DocketEvent = {
-          id: gid('d'),
-          type: newMatter.type === 'TM' ? 'FER Deadline' : 'Hearing',
-          matterId: newMatter.id,
-          matterName: `${newMatter.mark} (${newMatter.clientName})`,
-          date: newMatter.nextDate,
-          time: '10:30',
-          venue: 'IPO / Registry',
-          priority: newMatter.priority === 'h' ? 'ug' : 'wa',
-          attorney: newMatter.attorney,
-          notes: 'Auto-created from next deadline',
-        };
-        setDeadlines((prev) => [...prev, newDeadline]);
-      }
-
-      setActivities((prev) => [
-        {
-          id: gid('a'),
-          text: `<strong>New ${newMatter.type}:</strong> ${newMatter.mark}`,
-          time: 'Just now',
-          color: 'gd',
-        },
-        ...prev,
-      ]);
-      audit('CREATE', 'Matter', `${newMatter.type}: ${newMatter.mark}`);
-      closeModal();
-      showToast(`${newMatter.type} matter saved! Drive folder created.`, 'ok');
-    },
-    [audit, closeModal, showToast]
-  );
-
-  const deleteIprMatter = useCallback(
-    (id: string) => {
-      if (!canDeleteRecords) return;
-      const m = iprMatters.find((x) => x.id === id);
-      setIprMatters((prev) => prev.filter((x) => x.id !== id));
-      setDeadlines((prev) => prev.filter((d) => d.matterId !== id));
-      audit('DELETE', 'Matter', m?.mark || id);
-      showToast('Matter deleted', 'in');
-    },
-    [audit, canDeleteRecords, iprMatters, showToast]
-  );
-
-  // Court Matter actions
-  const addCourtMatter = useCallback(
-    (matterData: Omit<CourtMatter, 'id' | 'created' | 'statusHistory'>) => {
-      const filingDate = matterData.filingDate || new Date().toISOString().split('T')[0];
-      const newMatter: CourtMatter = {
-        ...matterData,
-        id: gid('r'),
-        created: new Date().toISOString().split('T')[0],
-        statusHistory: [
-          {
-            status: matterData.stage || 'Filed',
-            date: filingDate,
-            note: 'Matter filed in court',
-          },
-        ],
-      };
-      setCourtMatters((prev) => [...prev, newMatter]);
-
-      if (newMatter.nextDate) {
-        const venueParts = [newMatter.court];
-        if (newMatter.courtNo) venueParts.push(newMatter.courtNo);
-        const venueStr = venueParts.filter(Boolean).join(' · ');
-
-        let notesText = `Stage: ${newMatter.stage}`;
-        if (newMatter.judgeName) notesText += ` | Coram: ${newMatter.judgeName}`;
-        if (newMatter.vcLink) notesText += ` | VC: ${newMatter.vcLink}`;
-
-        const newDeadline: DocketEvent = {
-          id: gid('d'),
-          type: 'Hearing',
-          matterId: newMatter.id,
-          matterName: newMatter.caseTitle,
-          date: newMatter.nextDate,
-          time: '10:30',
-          venue: venueStr,
-          courtNo: newMatter.courtNo,
-          judgeName: newMatter.judgeName,
-          vcLink: newMatter.vcLink,
-          priority: newMatter.priority === 'h' ? 'ug' : 'wa',
-          attorney: newMatter.attorney,
-          notes: notesText,
-        };
-        setDeadlines((prev) => [...prev, newDeadline]);
-      }
-
-      setActivities((prev) => [
-        {
-          id: gid('a'),
-          text: `<strong>New ${newMatter.type} matter:</strong> ${newMatter.caseTitle}`,
-          time: 'Just now',
-          color: 'pr',
-        },
-        ...prev,
-      ]);
-      audit('CREATE', 'Court', `${newMatter.type}: ${newMatter.caseTitle}`);
-      closeModal();
-      showToast(`${newMatter.type} matter saved! Drive folder created.`, 'ok');
-    },
-    [audit, closeModal, showToast]
-  );
-
-  const deleteCourtMatter = useCallback(
-    (id: string) => {
-      if (!canDeleteRecords) return;
-      const r = courtMatters.find((x) => x.id === id);
-      setCourtMatters((prev) => prev.filter((x) => x.id !== id));
-      setDeadlines((prev) => prev.filter((d) => d.matterId !== id));
-      audit('DELETE', 'Court', r?.caseTitle || id);
-      showToast('Court matter deleted', 'in');
-    },
-    [audit, canDeleteRecords, courtMatters, showToast]
-  );
-
-  // Docket actions
-  const addDocketEvent = useCallback(
-    (eventData: Omit<DocketEvent, 'id'>) => {
-      const newEvent: DocketEvent = {
-        ...eventData,
-        id: gid('d'),
-      };
-      setDeadlines((prev) => [...prev, newEvent]);
-      setActivities((prev) => [
-        {
-          id: gid('a'),
-          text: `<strong>Event added:</strong> ${newEvent.type} on ${newEvent.date}`,
-          time: 'Just now',
-          color: 'gd',
-        },
-        ...prev,
-      ]);
-      audit('CREATE', 'Deadline', `${newEvent.type} on ${newEvent.date}`);
-      closeModal();
-      showToast('Event added to Docket & Calendar!', 'ok');
-    },
-    [audit, closeModal, showToast]
-  );
-
-  const deleteDocketEvent = useCallback(
-    (id: string) => {
-      if (!canDeleteRecords) return;
-      setDeadlines((prev) => prev.filter((d) => d.id !== id));
-      audit('DELETE', 'Deadline', `Event ${id}`);
-      showToast('Docket event removed', 'in');
-    },
-    [audit, canDeleteRecords, showToast]
-  );
-
   // Vault Folders & Documents
   const createVaultFolder = useCallback(
     (name: string, parentPath: string = '/LawyersDiary', color: string = '#38bdf8'): VaultFolder | null => {
@@ -1574,6 +1406,210 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [audit, documents, showToast]
   );
 
+  // IPR Matter actions
+  const addIprMatter = useCallback(
+    (matterData: Omit<IprMatter, 'id' | 'created' | 'statusHistory'>, attachedFiles?: File[]) => {
+      const filingDate = matterData.filingDate || new Date().toISOString().split('T')[0];
+      const newMatter: IprMatter = {
+        ...matterData,
+        id: gid('m'),
+        created: new Date().toISOString().split('T')[0],
+        statusHistory: [
+          {
+            status: matterData.status || 'Pending',
+            date: filingDate,
+            note: 'Matter created',
+          },
+        ],
+      };
+      setIprMatters((prev) => [...prev, newMatter]);
+
+      // Automatically provision matter folders in Vault
+      const previewFolder =
+        newMatter.type === 'TM'
+          ? `TM_${newMatter.appNo || 'App'}_${(newMatter.mark || 'Mark').replace(/\s+/g, '_')}_Class${newMatter.classes || 'X'}`
+          : `${newMatter.type}_${newMatter.appNo || 'App'}_${(newMatter.mark || 'Title').replace(/\s+/g, '_')}`;
+
+      const { rootPath } = ensureMatterFolders(newMatter.clientName, previewFolder);
+
+      // Upload attached files (mark representation, specimen, specifications, etc.) into vault
+      if (attachedFiles && attachedFiles.length > 0) {
+        const fileTags = [
+          newMatter.type,
+          newMatter.typeOfMark || 'Specimen',
+          'Initial Filing',
+        ];
+        uploadDocuments(attachedFiles, rootPath, newMatter.id, fileTags);
+      }
+
+      if (newMatter.nextDate) {
+        const newDeadline: DocketEvent = {
+          id: gid('d'),
+          type: newMatter.type === 'TM' ? 'FER Deadline' : 'Hearing',
+          matterId: newMatter.id,
+          matterName: `${newMatter.mark} (${newMatter.clientName})`,
+          date: newMatter.nextDate,
+          time: '10:30',
+          venue: 'IPO / Registry',
+          priority: newMatter.priority === 'h' ? 'ug' : 'wa',
+          attorney: newMatter.attorney,
+          notes: 'Auto-created from next deadline',
+        };
+        setDeadlines((prev) => [...prev, newDeadline]);
+      }
+
+      setActivities((prev) => [
+        {
+          id: gid('a'),
+          text: `<strong>New ${newMatter.type}:</strong> ${newMatter.mark}`,
+          time: 'Just now',
+          color: 'gd',
+        },
+        ...prev,
+      ]);
+      audit('CREATE', 'Matter', `${newMatter.type}: ${newMatter.mark}`);
+      closeModal();
+      showToast(
+        attachedFiles && attachedFiles.length > 0
+          ? `${newMatter.type} matter saved! ${attachedFiles.length} file(s) saved to Vault.`
+          : `${newMatter.type} matter saved! Drive vault folder provisioned.`,
+        'ok'
+      );
+      return newMatter;
+    },
+    [audit, closeModal, ensureMatterFolders, showToast, uploadDocuments]
+  );
+
+  const updateIprMatter = useCallback(
+    (id: string, updates: Partial<IprMatter>) => {
+      setIprMatters((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
+      );
+      audit('UPDATE', 'Matter', `Matter updated (${id})`);
+      showToast('Matter details updated successfully', 'ok');
+    },
+    [audit, showToast]
+  );
+
+  const deleteIprMatter = useCallback(
+    (id: string) => {
+      if (!canDeleteRecords) return;
+      const m = iprMatters.find((x) => x.id === id);
+      setIprMatters((prev) => prev.filter((x) => x.id !== id));
+      setDeadlines((prev) => prev.filter((d) => d.matterId !== id));
+      audit('DELETE', 'Matter', m?.mark || id);
+      showToast('Matter deleted', 'in');
+    },
+    [audit, canDeleteRecords, iprMatters, showToast]
+  );
+
+  // Court Matter actions
+  const addCourtMatter = useCallback(
+    (matterData: Omit<CourtMatter, 'id' | 'created' | 'statusHistory'>) => {
+      const filingDate = matterData.filingDate || new Date().toISOString().split('T')[0];
+      const newMatter: CourtMatter = {
+        ...matterData,
+        id: gid('r'),
+        created: new Date().toISOString().split('T')[0],
+        statusHistory: [
+          {
+            status: matterData.stage || 'Filed',
+            date: filingDate,
+            note: 'Matter filed in court',
+          },
+        ],
+      };
+      setCourtMatters((prev) => [...prev, newMatter]);
+
+      if (newMatter.nextDate) {
+        const venueParts = [newMatter.court];
+        if (newMatter.courtNo) venueParts.push(newMatter.courtNo);
+        const venueStr = venueParts.filter(Boolean).join(' · ');
+
+        let notesText = `Stage: ${newMatter.stage}`;
+        if (newMatter.judgeName) notesText += ` | Coram: ${newMatter.judgeName}`;
+        if (newMatter.vcLink) notesText += ` | VC: ${newMatter.vcLink}`;
+
+        const newDeadline: DocketEvent = {
+          id: gid('d'),
+          type: 'Hearing',
+          matterId: newMatter.id,
+          matterName: newMatter.caseTitle,
+          date: newMatter.nextDate,
+          time: '10:30',
+          venue: venueStr,
+          courtNo: newMatter.courtNo,
+          judgeName: newMatter.judgeName,
+          vcLink: newMatter.vcLink,
+          priority: newMatter.priority === 'h' ? 'ug' : 'wa',
+          attorney: newMatter.attorney,
+          notes: notesText,
+        };
+        setDeadlines((prev) => [...prev, newDeadline]);
+      }
+
+      setActivities((prev) => [
+        {
+          id: gid('a'),
+          text: `<strong>New ${newMatter.type} matter:</strong> ${newMatter.caseTitle}`,
+          time: 'Just now',
+          color: 'pr',
+        },
+        ...prev,
+      ]);
+      audit('CREATE', 'Court', `${newMatter.type}: ${newMatter.caseTitle}`);
+      closeModal();
+      showToast(`${newMatter.type} matter saved! Drive folder created.`, 'ok');
+    },
+    [audit, closeModal, showToast]
+  );
+
+  const deleteCourtMatter = useCallback(
+    (id: string) => {
+      if (!canDeleteRecords) return;
+      const r = courtMatters.find((x) => x.id === id);
+      setCourtMatters((prev) => prev.filter((x) => x.id !== id));
+      setDeadlines((prev) => prev.filter((d) => d.matterId !== id));
+      audit('DELETE', 'Court', r?.caseTitle || id);
+      showToast('Court matter deleted', 'in');
+    },
+    [audit, canDeleteRecords, courtMatters, showToast]
+  );
+
+  // Docket actions
+  const addDocketEvent = useCallback(
+    (eventData: Omit<DocketEvent, 'id'>) => {
+      const newEvent: DocketEvent = {
+        ...eventData,
+        id: gid('d'),
+      };
+      setDeadlines((prev) => [...prev, newEvent]);
+      setActivities((prev) => [
+        {
+          id: gid('a'),
+          text: `<strong>Event added:</strong> ${newEvent.type} on ${newEvent.date}`,
+          time: 'Just now',
+          color: 'gd',
+        },
+        ...prev,
+      ]);
+      audit('CREATE', 'Deadline', `${newEvent.type} on ${newEvent.date}`);
+      closeModal();
+      showToast('Event added to Docket & Calendar!', 'ok');
+    },
+    [audit, closeModal, showToast]
+  );
+
+  const deleteDocketEvent = useCallback(
+    (id: string) => {
+      if (!canDeleteRecords) return;
+      setDeadlines((prev) => prev.filter((d) => d.id !== id));
+      audit('DELETE', 'Deadline', `Event ${id}`);
+      showToast('Docket event removed', 'in');
+    },
+    [audit, canDeleteRecords, showToast]
+  );
+
   // Work Log
   const addWorkLog = useCallback(
     (logData: Omit<WorkLogEntry, 'id' | 'created'>) => {
@@ -1849,6 +1885,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       addClient,
       deleteClient,
       addIprMatter,
+      updateIprMatter,
       deleteIprMatter,
       addCourtMatter,
       deleteCourtMatter,
@@ -1929,6 +1966,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       addClient,
       deleteClient,
       addIprMatter,
+      updateIprMatter,
       deleteIprMatter,
       addCourtMatter,
       deleteCourtMatter,

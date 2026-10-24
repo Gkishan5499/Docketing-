@@ -187,7 +187,56 @@ export const IprMatterPage: React.FC<IprMatterPageProps> = ({ type }) => {
                   <>
                     <td className="tm">{m.appNo}</td>
                     <td>
-                      <strong style={{ color: 'var(--tx)', fontSize: '0.88rem' }}>{m.mark}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        {m.markImage ? (
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--bd2)',
+                              background: '#ffffff',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              flexShrink: 0,
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                            }}
+                          >
+                            <img
+                              src={m.markImage}
+                              alt={m.mark}
+                              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              border: '1px dashed var(--bd2)',
+                              background: 'var(--bg)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--tx2)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Award className="w-4 h-4 text-amber-700/60" />
+                          </div>
+                        )}
+                        <div>
+                          <strong style={{ color: 'var(--tx)', fontSize: '0.88rem', display: 'block' }}>{m.mark}</strong>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--tx2)', display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 500 }}>{m.typeOfMark || 'Word Mark'}</span>
+                            {m.markFileName && <span style={{ opacity: 0.7 }}>· {m.markFileName}</span>}
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td style={{ fontWeight: 500 }}>{m.clientName}</td>
                     <td>
@@ -215,7 +264,54 @@ export const IprMatterPage: React.FC<IprMatterPageProps> = ({ type }) => {
                   <>
                     <td className="tm">{m.appNo}</td>
                     <td>
-                      <strong style={{ color: 'var(--tx)', fontSize: '0.88rem' }}>{m.mark}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        {m.markImage ? (
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--bd2)',
+                              background: '#ffffff',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <img
+                              src={m.markImage}
+                              alt={m.mark}
+                              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              border: '1px dashed var(--bd2)',
+                              background: 'var(--bg)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--tx2)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Lightbulb className="w-4 h-4 text-amber-500/70" />
+                          </div>
+                        )}
+                        <div>
+                          <strong style={{ color: 'var(--tx)', fontSize: '0.88rem', display: 'block' }}>{m.mark}</strong>
+                          {m.markFileName && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--tx2)', opacity: 0.8 }}>{m.markFileName}</span>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td style={{ fontWeight: 500 }}>{m.clientName}</td>
                     <td style={{ fontSize: '0.78rem', color: 'var(--tx2)' }}>{m.inventors || '—'}</td>
@@ -231,7 +327,54 @@ export const IprMatterPage: React.FC<IprMatterPageProps> = ({ type }) => {
                   <>
                     <td className="tm">{m.appNo}</td>
                     <td>
-                      <strong style={{ color: 'var(--tx)', fontSize: '0.88rem' }}>{m.mark}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        {m.markImage ? (
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--bd2)',
+                              background: '#ffffff',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <img
+                              src={m.markImage}
+                              alt={m.mark}
+                              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              border: '1px dashed var(--bd2)',
+                              background: 'var(--bg)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--tx2)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <FileCheck2 className="w-4 h-4 text-indigo-500/70" />
+                          </div>
+                        )}
+                        <div>
+                          <strong style={{ color: 'var(--tx)', fontSize: '0.88rem', display: 'block' }}>{m.mark}</strong>
+                          {m.markFileName && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--tx2)', opacity: 0.8 }}>{m.markFileName}</span>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td>
                       <span className="chip">{m.nature || '—'}</span>
@@ -248,7 +391,54 @@ export const IprMatterPage: React.FC<IprMatterPageProps> = ({ type }) => {
                   <>
                     <td className="tm">{m.appNo}</td>
                     <td>
-                      <strong style={{ color: 'var(--tx)', fontSize: '0.88rem' }}>{m.mark}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        {m.markImage ? (
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--bd2)',
+                              background: '#ffffff',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <img
+                              src={m.markImage}
+                              alt={m.mark}
+                              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              border: '1px dashed var(--bd2)',
+                              background: 'var(--bg)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--tx2)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Boxes className="w-4 h-4 text-emerald-600/70" />
+                          </div>
+                        )}
+                        <div>
+                          <strong style={{ color: 'var(--tx)', fontSize: '0.88rem', display: 'block' }}>{m.mark}</strong>
+                          {m.markFileName && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--tx2)', opacity: 0.8 }}>{m.markFileName}</span>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td>
                       <span className="chip">Class {m.designClass || '—'}</span>
@@ -265,7 +455,54 @@ export const IprMatterPage: React.FC<IprMatterPageProps> = ({ type }) => {
                   <>
                     <td className="tm">{m.appNo}</td>
                     <td>
-                      <strong style={{ color: 'var(--tx)', fontSize: '0.88rem' }}>{m.mark}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        {m.markImage ? (
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--bd2)',
+                              background: '#ffffff',
+                              padding: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <img
+                              src={m.markImage}
+                              alt={m.mark}
+                              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '6px',
+                              border: '1px dashed var(--bd2)',
+                              background: 'var(--bg)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--tx2)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <MapPin className="w-4 h-4 text-rose-500/70" />
+                          </div>
+                        )}
+                        <div>
+                          <strong style={{ color: 'var(--tx)', fontSize: '0.88rem', display: 'block' }}>{m.mark}</strong>
+                          {m.markFileName && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--tx2)', opacity: 0.8 }}>{m.markFileName}</span>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td>
                       <span className="chip">{m.goods || '—'}</span>
