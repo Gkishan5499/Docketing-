@@ -34,13 +34,22 @@ const TYPE_ICONS: Record<IprType, React.ComponentType<{ className?: string }>> =
 };
 
 export const AddIprMatterModal: React.FC = () => {
-  const { modalState, closeModal, clients, addIprMatter, showToast } = useLawyersDiary();
+  const { modalState, closeModal, clients, iprMatters, addIprMatter, updateIprMatter, addClient, showToast } = useLawyersDiary();
 
-  const isOpen = modalState.type === 'add-ipr';
-  const initialType: IprType = modalState.payload || 'TM';
+  const isOpen = modalState.type === 'add-ipr' || modalState.type === 'edit-ipr';
+  const isEdit = modalState.type === 'edit-ipr';
+  const editingMatter = isEdit
+    ? typeof modalState.payload === 'object' && modalState.payload
+      ? modalState.payload
+      : iprMatters.find((m) => m.id === modalState.payload)
+    : null;
+
+  const initialType: IprType = isEdit && editingMatter ? editingMatter.type : modalState.payload || 'TM';
 
   const [activeType, setActiveType] = useState<IprType>(initialType);
   const [clientId, setClientId] = useState('');
+  const [customClientName, setCustomClientName] = useState('');
+  const [isNewClient, setIsNewClient] = useState(false);
   const [appNo, setAppNo] = useState('');
   const [mark, setMark] = useState('');
   const [typeOfMark, setTypeOfMark] = useState('Device / Logo Mark');
@@ -64,10 +73,58 @@ export const AddIprMatterModal: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (modalState.payload && ['TM', 'PAT', 'COPY', 'DESIGN', 'GI'].includes(modalState.payload)) {
-      setActiveType(modalState.payload);
+    if (!isOpen) return;
+
+    if (isEdit && editingMatter) {
+      setActiveType(editingMatter.type || 'TM');
+      setClientId(editingMatter.clientId || '');
+      setCustomClientName(editingMatter.clientName || '');
+      setIsNewClient(false);
+      setAppNo(editingMatter.appNo || '');
+      setMark(editingMatter.mark || '');
+      setTypeOfMark(editingMatter.typeOfMark || 'Device / Logo Mark');
+      setClasses(editingMatter.classes || '');
+      setInventors(editingMatter.inventors || '');
+      setNature(editingMatter.nature || 'Literary / Dramatic');
+      setDesignClass(editingMatter.designClass || '');
+      setGoods(editingMatter.goods || '');
+      setArea(editingMatter.area || '');
+      setFilingDate(editingMatter.filingDate || new Date().toISOString().split('T')[0]);
+      setStatus(editingMatter.status || 'Pending');
+      setNextDate(editingMatter.nextDate || '');
+      setAttorney(editingMatter.attorney || 'Self');
+      setPriority(editingMatter.priority || 'm');
+      setNotes(editingMatter.notes || '');
+      setMarkImagePreview(editingMatter.markImage || '');
+      setAttachedFiles([]);
+    } else {
+      if (modalState.payload && ['TM', 'PAT', 'COPY', 'DESIGN', 'GI'].includes(modalState.payload)) {
+        setActiveType(modalState.payload);
+      } else {
+        setActiveType('TM');
+      }
+      setClientId('');
+      setCustomClientName('');
+      setIsNewClient(clients.length === 0);
+      setAppNo('');
+      setMark('');
+      setTypeOfMark('Device / Logo Mark');
+      setClasses('');
+      setInventors('');
+      setNature('Literary / Dramatic');
+      setDesignClass('');
+      setGoods('');
+      setArea('');
+      setFilingDate(new Date().toISOString().split('T')[0]);
+      setStatus('Pending');
+      setNextDate('');
+      setAttorney('Self');
+      setPriority('m');
+      setNotes('');
+      setMarkImagePreview('');
+      setAttachedFiles([]);
     }
-  }, [modalState.payload]);
+  }, [isOpen, isEdit, editingMatter, modalState.payload, clients.length]);
 
   if (!isOpen) return null;
 
@@ -193,13 +250,70 @@ export const AddIprMatterModal: React.FC = () => {
       showToast('Please provide the Mark Name / Title', 'er');
       return;
     }
-    const client = clients.find((c) => c.id === clientId);
+
+    let finalClientId = clientId;
+    let finalClientName = 'General Client';
+
+    if (isNewClient || clients.length === 0 || !clientId) {
+      const trimmedName = customClientName.trim() || 'General Client';
+      finalClientName = trimmedName;
+      const existing = clients.find((c) => c.name.toLowerCase() === trimmedName.toLowerCase());
+      if (existing) {
+        finalClientId = existing.id;
+        finalClientName = existing.name;
+      } else {
+        const createdClient = addClient(
+          {
+            name: trimmedName,
+            type: 'Company',
+            country: 'India',
+            contact: '',
+            email: '',
+            phone: '',
+            attorney,
+          },
+          false
+        );
+        if (createdClient?.id) finalClientId = createdClient.id;
+      }
+    } else {
+      const client = clients.find((c) => c.id === clientId);
+      finalClientId = client?.id || '';
+      finalClientName = client?.name || 'General Client';
+    }
+
+    if (isEdit && editingMatter) {
+      updateIprMatter(editingMatter.id, {
+        type: activeType,
+        clientId: finalClientId,
+        clientName: finalClientName,
+        appNo: appNo.trim() || editingMatter.appNo,
+        mark: mark.trim(),
+        typeOfMark: activeType === 'TM' ? typeOfMark : undefined,
+        markImage: markImagePreview || editingMatter.markImage,
+        markFileName: attachedFiles[0]?.name || editingMatter.markFileName,
+        classes: classes.trim(),
+        inventors: inventors.trim(),
+        nature,
+        designClass: designClass.trim(),
+        goods: goods.trim(),
+        area: area.trim(),
+        filingDate,
+        status,
+        nextDate: nextDate || undefined,
+        attorney,
+        priority,
+        notes: notes.trim(),
+      });
+      closeModal();
+      return;
+    }
 
     addIprMatter(
       {
         type: activeType,
-        clientId: client?.id || '',
-        clientName: client?.name || (clientId ? 'Custom Client' : 'General Client'),
+        clientId: finalClientId,
+        clientName: finalClientName,
         appNo: appNo.trim() || `APP-${Date.now().toString().slice(-6)}`,
         mark: mark.trim(),
         typeOfMark: activeType === 'TM' ? typeOfMark : undefined,
@@ -236,7 +350,7 @@ export const AddIprMatterModal: React.FC = () => {
           <div className="flex items-center gap-2.5">
             <ActiveIcon className="w-5 h-5 text-amber-700" />
             <h3 id="mo-m-t" className="m-0 text-[1.2rem] font-bold text-slate-900">
-              New {TN[activeType]} Matter{' '}
+              {isEdit ? `Edit ${TN[activeType]} Matter` : `New ${TN[activeType]} Matter`}{' '}
               <span className="mo-t" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', background: 'var(--bd)', borderRadius: '4px' }}>
                 {activeType}
               </span>
@@ -268,21 +382,51 @@ export const AddIprMatterModal: React.FC = () => {
             <div className="fg">
               {/* Client Selection */}
               <div className="fgp sp">
-                <label className="fl">
-                  Registered Client <span className="req">*</span>
-                </label>
-                <select
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  required
-                >
-                  <option value="">— Select Registered Client Entity —</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.type})
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label className="fl" style={{ margin: 0 }}>
+                    Client Entity <span className="req">*</span>
+                  </label>
+                  {clients.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsNewClient(!isNewClient)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#0284c7',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    >
+                      {isNewClient ? '← Select existing client' : '+ New Client'}
+                    </button>
+                  )}
+                </div>
+
+                {isNewClient || clients.length === 0 ? (
+                  <input
+                    type="text"
+                    placeholder="Enter Client or Company Name (e.g. Acme Corp)"
+                    value={customClientName}
+                    onChange={(e) => setCustomClientName(e.target.value)}
+                    required
+                  />
+                ) : (
+                  <select
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    required
+                  >
+                    <option value="">— Select Registered Client Entity —</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.type})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Trademark Form */}
@@ -855,7 +999,7 @@ export const AddIprMatterModal: React.FC = () => {
             className="btn btn-p"
             onClick={handleSave}
           >
-            Save Matter &amp; Provision Vault
+            {isEdit ? 'Save Changes' : 'Save Matter & Provision Vault'}
           </button>
         </div>
       </div>

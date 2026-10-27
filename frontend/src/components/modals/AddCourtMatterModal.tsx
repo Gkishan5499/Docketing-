@@ -91,12 +91,21 @@ const HC_NATURE = [
 ];
 
 export const AddCourtMatterModal: React.FC = () => {
-  const { modalState, closeModal, clients, addCourtMatter, showToast } = useLawyersDiary();
+  const { modalState, closeModal, clients, courtMatters, addCourtMatter, updateCourtMatter, addClient, showToast } = useLawyersDiary();
 
-  const isOpen = modalState.type === 'add-court';
-  const courtType: CourtType = modalState.payload || 'HC';
+  const isOpen = modalState.type === 'add-court' || modalState.type === 'edit-court';
+  const isEdit = modalState.type === 'edit-court';
+  const editingMatter = isEdit
+    ? typeof modalState.payload === 'object' && modalState.payload
+      ? modalState.payload
+      : courtMatters.find((r) => r.id === modalState.payload)
+    : null;
+
+  const courtType: CourtType = isEdit && editingMatter ? editingMatter.type : modalState.payload || 'HC';
 
   const [clientId, setClientId] = useState('');
+  const [customClientName, setCustomClientName] = useState('');
+  const [isNewClient, setIsNewClient] = useState(false);
   const [caseNo, setCaseNo] = useState('');
   const [caseTitle, setCaseTitle] = useState('');
   const [court, setCourt] = useState('');
@@ -114,12 +123,40 @@ export const AddCourtMatterModal: React.FC = () => {
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
-    if (modalState.payload) {
+    if (!isOpen) return;
+
+    if (isEdit && editingMatter) {
+      setClientId(editingMatter.clientId || '');
+      setCustomClientName(editingMatter.clientName || '');
+      setIsNewClient(false);
+      setCaseNo(editingMatter.caseNo || '');
+      setCaseTitle(editingMatter.caseTitle || '');
+      setCourt(editingMatter.court || '');
+      setBench(editingMatter.bench || 'Single Bench');
+      setNature(editingMatter.nature || 'Writ Petition (Civil)');
+      setCustomNature('');
+      setCourtNo(editingMatter.courtNo || '');
+      setJudgeName(editingMatter.judgeName || '');
+      setVcLink(editingMatter.vcLink || '');
+      setFilingDate(editingMatter.filingDate || new Date().toISOString().split('T')[0]);
+      setNextDate(editingMatter.nextDate || '');
+      setStage(editingMatter.stage || 'Filed');
+      setAttorney(editingMatter.attorney || 'Self');
+      setPriority(editingMatter.priority || 'm');
+      setNotes(editingMatter.notes || '');
+    } else if (modalState.payload) {
       const ty: CourtType = modalState.payload;
       setCustomNature('');
       setCourtNo('');
       setJudgeName('');
       setVcLink('');
+      setCaseNo('');
+      setCaseTitle('');
+      setNotes('');
+      setNextDate('');
+      setClientId('');
+      setCustomClientName('');
+      setIsNewClient(clients.length === 0);
 
       if (ty === 'SC') {
         setCourt('Supreme Court of India');
@@ -170,7 +207,7 @@ export const AddCourtMatterModal: React.FC = () => {
         setStage('Pleadings');
       }
     }
-  }, [modalState.payload]);
+  }, [isOpen, isEdit, editingMatter, modalState.payload, clients.length]);
 
   if (!isOpen) return null;
 
@@ -190,12 +227,65 @@ export const AddCourtMatterModal: React.FC = () => {
       finalNature = customNature.trim();
     }
 
-    const client = clients.find((c) => c.id === clientId);
+    let finalClientId = clientId;
+    let finalClientName = 'General Client';
+
+    if (isNewClient || clients.length === 0 || !clientId) {
+      const trimmedName = customClientName.trim() || 'General Client';
+      finalClientName = trimmedName;
+      const existing = clients.find((c) => c.name.toLowerCase() === trimmedName.toLowerCase());
+      if (existing) {
+        finalClientId = existing.id;
+        finalClientName = existing.name;
+      } else {
+        const createdClient = addClient(
+          {
+            name: trimmedName,
+            type: 'Company',
+            country: 'India',
+            contact: '',
+            email: '',
+            phone: '',
+            attorney,
+          },
+          false
+        );
+        if (createdClient?.id) finalClientId = createdClient.id;
+      }
+    } else {
+      const client = clients.find((c) => c.id === clientId);
+      finalClientId = client?.id || '';
+      finalClientName = client?.name || 'General Client';
+    }
+
+    if (isEdit && editingMatter) {
+      updateCourtMatter(editingMatter.id, {
+        type: courtType,
+        clientId: finalClientId,
+        clientName: finalClientName,
+        caseNo: caseNo.trim(),
+        caseTitle: caseTitle.trim(),
+        court: court || CRT_NAMES[courtType],
+        courtNo: courtNo.trim() || undefined,
+        judgeName: judgeName.trim() || undefined,
+        vcLink: vcLink.trim() || undefined,
+        bench: bench.trim(),
+        nature: finalNature.trim(),
+        filingDate,
+        nextDate: nextDate || undefined,
+        stage,
+        attorney,
+        priority,
+        notes: notes.trim(),
+      });
+      closeModal();
+      return;
+    }
 
     addCourtMatter({
       type: courtType,
-      clientId: client?.id || '',
-      clientName: client?.name || (clientId ? 'Custom Client' : 'General Client'),
+      clientId: finalClientId,
+      clientName: finalClientName,
       caseNo: caseNo.trim(),
       caseTitle: caseTitle.trim(),
       court: court || CRT_NAMES[courtType],
@@ -220,7 +310,7 @@ export const AddCourtMatterModal: React.FC = () => {
           <div className="flex items-center gap-2.5">
             <Landmark className="w-5 h-5 text-slate-800" />
             <h3 id="mo-crt-t" className="m-0 text-[1.2rem]">
-              New {CRT_NAMES[courtType]} Litigation <span className="mo-t" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', background: 'var(--bd)', borderRadius: '4px' }}>{courtType}</span>
+              {isEdit ? 'Edit' : 'New'} {CRT_NAMES[courtType]} Litigation <span className="mo-t" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', background: 'var(--bd)', borderRadius: '4px' }}>{courtType}</span>
             </h3>
           </div>
           <button className="mc" onClick={closeModal} title="Close">
@@ -233,21 +323,51 @@ export const AddCourtMatterModal: React.FC = () => {
             <div className="fg">
               {/* Client Selection */}
               <div className="fgp sp">
-                <label className="fl">
-                  Registered Client Entity <span className="req">*</span>
-                </label>
-                <select
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  required
-                >
-                  <option value="">— Select Registered Client Entity —</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.type})
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label className="fl" style={{ margin: 0 }}>
+                    Registered Client Entity <span className="req">*</span>
+                  </label>
+                  {clients.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsNewClient(!isNewClient)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#0284c7',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    >
+                      {isNewClient ? '← Select existing client' : '+ New Client'}
+                    </button>
+                  )}
+                </div>
+
+                {isNewClient || clients.length === 0 ? (
+                  <input
+                    type="text"
+                    placeholder="Enter Client or Company Name (e.g. Rajan & Sons Pvt. Ltd.)"
+                    value={customClientName}
+                    onChange={(e) => setCustomClientName(e.target.value)}
+                    required
+                  />
+                ) : (
+                  <select
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    required
+                  >
+                    <option value="">— Select Registered Client Entity —</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.type})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="fss">{CRT_NAMES[courtType]} Case Particulars</div>
@@ -545,7 +665,7 @@ export const AddCourtMatterModal: React.FC = () => {
             Cancel
           </button>
           <button type="button" className="btn btn-p" onClick={handleSave}>
-            Save Matter &amp; Create Drive Repository
+            {isEdit ? 'Save Changes' : 'Save Matter & Create Drive Repository'}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import {
   FileText,
   Mail,
   MapPin,
+  Pencil,
   Phone,
   StickyNote,
   UserRound,
@@ -99,8 +100,18 @@ export const ClientDetailModal: React.FC = () => {
           </div>
         </div>
         <div className="mf">
+          <button
+            type="button"
+            className="btn btn-p"
+            onClick={() => {
+              closeModal();
+              openModal('edit-client', client);
+            }}
+          >
+            <Pencil className="w-3.5 h-3.5" /> Edit Client
+          </button>
           <button type="button" className="btn btn-o" onClick={() => closeModal()}>Close</button>
-          <button type="button" className="btn btn-p" onClick={() => window.alert(`Document Vault: /LawyersDiary/${client.name}`)}><MapPin className="w-3.5 h-3.5" /> Open client vault</button>
+          <button type="button" className="btn btn-o" onClick={() => window.alert(`Document Vault: /LawyersDiary/${client.name}`)}><MapPin className="w-3.5 h-3.5" /> Open client vault</button>
         </div>
       </div>
     </div>

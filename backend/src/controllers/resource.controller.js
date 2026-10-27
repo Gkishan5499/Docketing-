@@ -3,7 +3,12 @@ const { fail, ok, parsePagination } = require('../utils');
 
 function pickFields(source, fields) {
   return fields.reduce((result, field) => {
-    if (source[field] !== undefined) result[field] = source[field];
+    if (source[field] !== undefined) {
+      if (field.endsWith('Id') && source[field] && !mongoose.isValidObjectId(source[field])) {
+        return result;
+      }
+      result[field] = source[field];
+    }
     return result;
   }, {});
 }

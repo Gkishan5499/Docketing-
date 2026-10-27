@@ -534,26 +534,16 @@ export const DriveDocumentsPage: React.FC = () => {
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            {selectedFolder !== '/LawyersDiary' && (
               <button
                 type="button"
-                className="btn btn-o btn-s flex items-center gap-1"
-                style={{ fontSize: '0.75rem' }}
-                onClick={() => handleOpenCreateFolder(selectedFolder)}
+                onClick={() => setSelectedFolder('/LawyersDiary')}
+                className="text-xs text-sky-600 hover:underline flex items-center gap-1"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
               >
-                <FolderPlus size={13} className="text-sky-600" />
-                <span>+ Subfolder</span>
+                <span>Back to Root</span>
               </button>
-              <button
-                type="button"
-                className="btn btn-p btn-s flex items-center gap-1"
-                style={{ fontSize: '0.75rem' }}
-                onClick={() => handleOpenUpload(selectedFolder)}
-              >
-                <UploadCloud size={13} />
-                <span>+ Upload Here</span>
-              </button>
-            </div>
+            )}
           </div>
 
           {/* Filter Bar & Search */}
@@ -708,40 +698,31 @@ export const DriveDocumentsPage: React.FC = () => {
                     <tr>
                       <td colSpan={6} style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--tx2)' }}>
                         <div
+                          onClick={() => handleOpenUpload(selectedFolder)}
                           style={{
-                            maxWidth: '380px',
+                            maxWidth: '420px',
                             margin: '0 auto',
                             border: '2px dashed var(--bd)',
                             borderRadius: '12px',
-                            padding: '2rem 1.5rem',
+                            padding: '2.5rem 1.5rem',
                             background: 'var(--bg2)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
                           }}
+                          className="hover:border-sky-500 hover:bg-sky-50/40 group"
                         >
-                          <FolderOpen className="w-10 h-10 text-slate-400 mx-auto mb-2.5 text-sky-500" />
+                          <div className="w-12 h-12 rounded-full bg-sky-100 group-hover:bg-sky-200 flex items-center justify-center mx-auto mb-3 text-sky-600 transition-colors">
+                            <UploadCloud className="w-6 h-6" />
+                          </div>
                           <h4 style={{ margin: '0 0 0.35rem', color: 'var(--tx)', fontSize: '0.95rem' }}>
                             {selectedFolder === '/LawyersDiary' ? 'No documents in vault' : `Folder "${selectedFolder.split('/').pop()}" is empty`}
                           </h4>
-                          <p style={{ margin: '0 0 1.25rem', fontSize: '0.78rem', color: 'var(--tx2)' }}>
-                            Upload pleadings, exhibits, orders, or create subfolders to organize this case directory.
+                          <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: 'var(--tx2)' }}>
+                            Drag and drop files here, or <span className="text-sky-600 font-semibold group-hover:underline">click to upload</span>
                           </p>
-                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                            <button
-                              type="button"
-                              className="btn btn-p btn-s"
-                              onClick={() => handleOpenUpload(selectedFolder)}
-                            >
-                              <UploadCloud size={14} />
-                              <span>Upload Document Here</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-o btn-s"
-                              onClick={() => handleOpenCreateFolder(selectedFolder)}
-                            >
-                              <FolderPlus size={14} className="text-sky-600" />
-                              <span>New Subfolder</span>
-                            </button>
-                          </div>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--tx3)' }}>
+                            Supports PDF, DOCX, XLSX, PNG, JPG (up to 50MB)
+                          </span>
                         </div>
                       </td>
                     </tr>

@@ -17,6 +17,8 @@ import {
   X,
   Sparkles,
   Check,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 
 const EC: Record<string, string> = {
@@ -70,6 +72,8 @@ export const DocketCalendarPage: React.FC = () => {
   const {
     deadlines,
     openModal,
+    deleteDocketEvent,
+    canDeleteRecords,
     syncDriveAndCalendar,
     showToast,
     googleCalendarEmail,
@@ -238,8 +242,48 @@ export const DocketCalendarPage: React.FC = () => {
             {d.time ? ` · ${d.time}` : ''}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginLeft: 'auto' }}>
           <span className={`ddys ${dc}`}>{lbl}</span>
+          <button
+            type="button"
+            className="btn btn-o btn-s"
+            style={{
+              padding: '0.24rem 0.42rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              fontSize: '0.72rem',
+              cursor: 'pointer',
+            }}
+            title="Edit Event"
+            onClick={(e) => {
+              e.stopPropagation();
+              openModal('edit-docket', d);
+            }}
+          >
+            <Pencil size={12} />
+          </button>
+          {canDeleteRecords && (
+            <button
+              type="button"
+              className="btn btn-d btn-s"
+              style={{
+                padding: '0.24rem 0.42rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                fontSize: '0.72rem',
+                cursor: 'pointer',
+              }}
+              title="Delete Event"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`Delete docket event "${d.type} - ${d.matterName}"?`)) {
+                  deleteDocketEvent(d.id);
+                }
+              }}
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-g btn-s"
@@ -837,20 +881,64 @@ export const DocketCalendarPage: React.FC = () => {
                           {ev.matterName}
                         </h4>
                       </div>
-                      <button
-                        type="button"
-                        className="btn btn-p btn-s"
-                        style={{
-                          fontSize: '0.72rem',
-                          padding: '0.3rem 0.55rem',
-                          whiteSpace: 'nowrap',
-                        }}
-                        onClick={() => openEventInGoogleCalendar(ev)}
-                        title={`Add to Google Calendar (${googleCalendarEmail || 'Gmail'})`}
-                      >
-                        <GoogleCalendarIcon size={13} />
-                        <span>Add to Cal</span>
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-o btn-s"
+                          style={{
+                            fontSize: '0.72rem',
+                            padding: '0.28rem 0.45rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                          }}
+                          onClick={() => {
+                            setSelectedDayModal(null);
+                            openModal('edit-docket', ev);
+                          }}
+                          title="Edit Event"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        {canDeleteRecords && (
+                          <button
+                            type="button"
+                            className="btn btn-d btn-s"
+                            style={{
+                              fontSize: '0.72rem',
+                              padding: '0.28rem 0.45rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                            }}
+                            onClick={() => {
+                              if (window.confirm(`Delete docket event "${ev.type} - ${ev.matterName}"?`)) {
+                                deleteDocketEvent(ev.id);
+                                setSelectedDayModal((prev) =>
+                                  prev
+                                    ? { ...prev, events: prev.events.filter((x) => x.id !== ev.id) }
+                                    : null
+                                );
+                              }
+                            }}
+                            title="Delete Event"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-p btn-s"
+                          style={{
+                            fontSize: '0.72rem',
+                            padding: '0.3rem 0.55rem',
+                            whiteSpace: 'nowrap',
+                          }}
+                          onClick={() => openEventInGoogleCalendar(ev)}
+                          title={`Add to Google Calendar (${googleCalendarEmail || 'Gmail'})`}
+                        >
+                          <GoogleCalendarIcon size={13} />
+                          <span>Add to Cal</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div

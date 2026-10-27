@@ -4,7 +4,7 @@ const { organizationRef, userRef } = require('./common');
 const matterSchema = new mongoose.Schema({
   organizationId: organizationRef,
   type: { type: String, required: true, uppercase: true },
-  clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true, index: true },
+  clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', index: true },
   clientName: String,
   appNo: String,
   mark: String,

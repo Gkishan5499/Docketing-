@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLawyersDiary } from '../../context/LawyersDiaryContext';
 import { X, Users, FolderOpen } from 'lucide-react';
 
 export const AddClientModal: React.FC = () => {
-  const { modalState, closeModal, addClient, showToast } = useLawyersDiary();
+  const { modalState, closeModal, clients, addClient, updateClient, showToast } = useLawyersDiary();
 
-  const isOpen = modalState.type === 'add-client';
+  const isOpen = modalState.type === 'add-client' || modalState.type === 'edit-client';
+  const isEdit = modalState.type === 'edit-client';
+  const editingClient = isEdit
+    ? typeof modalState.payload === 'object' && modalState.payload
+      ? modalState.payload
+      : clients.find((c) => c.id === modalState.payload)
+    : null;
 
   const [name, setName] = useState('');
   const [type, setType] = useState('Company');
@@ -15,6 +21,28 @@ export const AddClientModal: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [attorney, setAttorney] = useState('Self');
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (isEdit && editingClient) {
+      setName(editingClient.name || '');
+      setType(editingClient.type || 'Company');
+      setCountry(editingClient.country || 'India');
+      setContact(editingClient.contact || '');
+      setEmail(editingClient.email || '');
+      setPhone(editingClient.phone || '');
+      setAttorney(editingClient.attorney || 'Self');
+    } else {
+      setName('');
+      setType('Company');
+      setCountry('India');
+      setContact('');
+      setEmail('');
+      setPhone('');
+      setAttorney('Self');
+    }
+  }, [isOpen, isEdit, editingClient]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -23,6 +51,21 @@ export const AddClientModal: React.FC = () => {
       showToast('Client / Company name is required', 'er');
       return;
     }
+
+    if (isEdit && editingClient) {
+      updateClient(editingClient.id, {
+        name: name.trim(),
+        type,
+        country,
+        contact: contact.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        attorney,
+      });
+      closeModal();
+      return;
+    }
+
     addClient({
       name: name.trim(),
       type,
@@ -40,7 +83,7 @@ export const AddClientModal: React.FC = () => {
         <div className="mh">
           <div className="flex items-center gap-2.5">
             <Users className="w-5 h-5 text-slate-800" />
-            <h3 className="m-0 text-[1.2rem]">Enroll Retained Client</h3>
+            <h3 className="m-0 text-[1.2rem]">{isEdit ? 'Edit Client Details' : 'Enroll Retained Client'}</h3>
           </div>
           <button className="mc" onClick={closeModal} title="Close">
             <X className="w-4 h-4" />
@@ -145,7 +188,7 @@ export const AddClientModal: React.FC = () => {
             Cancel
           </button>
           <button type="button" className="btn btn-p" onClick={handleSubmit}>
-            Create Client &amp; Provision Vault
+            {isEdit ? 'Save Changes' : 'Create Client & Provision Vault'}
           </button>
         </div>
       </div>

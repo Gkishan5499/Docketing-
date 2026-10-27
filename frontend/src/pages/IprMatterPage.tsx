@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLawyersDiary } from '../context/LawyersDiaryContext';
 import { IprType } from '../types';
 import { bSt, dCell } from '../utils/helpers';
-import { Plus, Eye, Trash2, Filter, Award, Lightbulb, FileCheck2, Boxes, MapPin } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, Filter, Award, Lightbulb, FileCheck2, Boxes, MapPin } from 'lucide-react';
 
 interface IprMatterPageProps {
   type: IprType;
@@ -519,6 +519,17 @@ export const IprMatterPage: React.FC<IprMatterPageProps> = ({ type }) => {
                 {/* Actions */}
                 <td style={{ textAlign: 'right' }}>
                   <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+                    <button
+                      className="btn btn-o btn-s"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openModal('edit-ipr', m);
+                      }}
+                      title="Edit Matter"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
                     <button
                       className="btn btn-o btn-s"
                       onClick={(e) => {

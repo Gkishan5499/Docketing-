@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLawyersDiary } from '../context/LawyersDiaryContext';
-import { Plus, Search, FolderOpen, Trash2, Users, Building, Mail, Phone } from 'lucide-react';
+import { Plus, Search, FolderOpen, Pencil, Trash2, Users, Building, Mail, Phone } from 'lucide-react';
 
 export const ClientsPage: React.FC = () => {
   const {
@@ -119,6 +119,16 @@ export const ClientsPage: React.FC = () => {
                   <td style={{ fontWeight: 500, color: 'var(--tx)' }}>{c.attorney}</td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+                      <button
+                        className="btn btn-o btn-s"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openModal('edit-client', c);
+                        }}
+                        title="Edit Client"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                       {canDeleteRecords && <button
                         className="btn btn-o btn-s"
                         onClick={(e) => {

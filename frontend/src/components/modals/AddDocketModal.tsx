@@ -4,11 +4,18 @@ import { DocketPriority } from '../../types';
 import { X, Calendar, CheckCircle2 } from 'lucide-react';
 
 export const AddDocketModal: React.FC = () => {
-  const { modalState, closeModal, iprMatters, courtMatters, addDocketEvent, showToast } =
+  const { modalState, closeModal, deadlines, iprMatters, courtMatters, addDocketEvent, updateDocketEvent, showToast } =
     useLawyersDiary();
 
-  const isOpen = modalState.type === 'add-docket';
-  const initialMatterId = modalState.payload || '';
+  const isOpen = modalState.type === 'add-docket' || modalState.type === 'edit-docket';
+  const isEdit = modalState.type === 'edit-docket';
+  const editingEvent = isEdit
+    ? typeof modalState.payload === 'object' && modalState.payload
+      ? modalState.payload
+      : deadlines.find((d) => d.id === modalState.payload)
+    : null;
+
+  const initialMatterId = isEdit && editingEvent ? editingEvent.matterId : (typeof modalState.payload === 'string' ? modalState.payload : '');
 
   const [type, setType] = useState('Hearing');
   const [priority, setPriority] = useState<DocketPriority>('wa');
@@ -20,10 +27,28 @@ export const AddDocketModal: React.FC = () => {
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
-    if (modalState.payload) {
-      setMatterId(modalState.payload);
+    if (!isOpen) return;
+
+    if (isEdit && editingEvent) {
+      setType(editingEvent.type || 'Hearing');
+      setPriority(editingEvent.priority || 'wa');
+      setMatterId(editingEvent.matterId || '');
+      setDate(editingEvent.date || new Date().toISOString().split('T')[0]);
+      setTime(editingEvent.time || '10:30');
+      setVenue(editingEvent.venue || '');
+      setAttorney(editingEvent.attorney || 'Self');
+      setNotes(editingEvent.notes || '');
+    } else {
+      setType('Hearing');
+      setPriority('wa');
+      setMatterId(typeof modalState.payload === 'string' ? modalState.payload : '');
+      setDate(new Date().toISOString().split('T')[0]);
+      setTime('10:30');
+      setVenue('');
+      setAttorney('Self');
+      setNotes('');
     }
-  }, [modalState.payload]);
+  }, [isOpen, isEdit, editingEvent, modalState.payload]);
 
   if (!isOpen) return null;
 
@@ -40,6 +65,22 @@ export const AddDocketModal: React.FC = () => {
         ? `${m.mark} (${m.clientName})`
         : `${m.caseTitle} (${m.clientName})`
       : 'General Matter';
+
+    if (isEdit && editingEvent) {
+      updateDocketEvent(editingEvent.id, {
+        type,
+        priority,
+        matterId,
+        matterName: matterId ? matterName : editingEvent.matterName,
+        date,
+        time,
+        venue: venue.trim(),
+        attorney,
+        notes: notes.trim(),
+      });
+      closeModal();
+      return;
+    }
 
     addDocketEvent({
       type,
@@ -60,7 +101,7 @@ export const AddDocketModal: React.FC = () => {
         <div className="mh">
           <div className="flex items-center gap-2.5">
             <Calendar className="w-5 h-5 text-slate-800" />
-            <h3 className="m-0 text-[1.2rem]">Schedule Docket Event</h3>
+            <h3 className="m-0 text-[1.2rem]">{isEdit ? 'Edit Docket Event' : 'Schedule Docket Event'}</h3>
           </div>
           <button className="mc" onClick={closeModal} title="Close">
             <X className="w-4 h-4" />
@@ -195,7 +236,7 @@ export const AddDocketModal: React.FC = () => {
             Cancel
           </button>
           <button type="button" className="btn btn-p" onClick={handleSubmit}>
-            Schedule Event &amp; Sync Calendar
+            {isEdit ? 'Save Changes' : 'Schedule Event & Sync Calendar'}
           </button>
         </div>
       </div>

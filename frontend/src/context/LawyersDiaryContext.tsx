@@ -14,6 +14,7 @@ import {
   IprType,
   CourtType,
   LegalNotice,
+  DocketPriority,
 } from '../types';
 import {
   initialClients,
@@ -42,10 +43,14 @@ interface ModalState {
   type:
     | 'none'
     | 'add-ipr'
+    | 'edit-ipr'
     | 'add-court'
+    | 'edit-court'
     | 'add-client'
+    | 'edit-client'
     | 'client-detail'
     | 'add-docket'
+    | 'edit-docket'
     | 'matter-detail'
     | 'log-time'
     | 'note'
@@ -137,17 +142,20 @@ interface LawyersDiaryContextType {
   closeModal: () => void;
 
   // Actions
-  addClient: (client: Omit<Client, 'id' | 'created'>) => void;
+  addClient: (client: Omit<Client, 'id' | 'created'>, shouldCloseModal?: boolean) => Client;
+  updateClient: (id: string, updates: Partial<Client>) => void;
   deleteClient: (id: string) => void;
 
   addIprMatter: (matter: Omit<IprMatter, 'id' | 'created' | 'statusHistory'>, attachedFiles?: File[]) => IprMatter;
   updateIprMatter: (id: string, updates: Partial<IprMatter>) => void;
   deleteIprMatter: (id: string) => void;
 
-  addCourtMatter: (matter: Omit<CourtMatter, 'id' | 'created' | 'statusHistory'>) => void;
+  addCourtMatter: (matter: Omit<CourtMatter, 'id' | 'created' | 'statusHistory'>) => CourtMatter;
+  updateCourtMatter: (id: string, updates: Partial<CourtMatter>) => void;
   deleteCourtMatter: (id: string) => void;
 
-  addDocketEvent: (event: Omit<DocketEvent, 'id'>) => void;
+  addDocketEvent: (event: Omit<DocketEvent, 'id'>) => DocketEvent;
+  updateDocketEvent: (id: string, updates: Partial<DocketEvent>) => void;
   deleteDocketEvent: (id: string) => void;
 
   createVaultFolder: (name: string, parentPath?: string, color?: string) => VaultFolder | null;
@@ -204,33 +212,6 @@ interface LawyersDiaryContextType {
 
 const LawyersDiaryContext = createContext<LawyersDiaryContextType | undefined>(undefined);
 
-// Purge legacy unscoped mock keys from localStorage on startup
-const LEGACY_STORAGE_KEYS = [
-  'ld_react_clients',
-  'ld_react_iprMatters',
-  'ld_react_courtMatters',
-  'ld_react_deadlines',
-  'ld_react_documents',
-  'ld_react_vaultFolders',
-  'ld_react_activities',
-  'ld_react_auditLogs',
-  'ld_react_workLogs',
-  'ld_react_notes',
-  'ld_react_legalNotices',
-];
-
-if (typeof window !== 'undefined') {
-  try {
-    for (const key of LEGACY_STORAGE_KEYS) {
-      localStorage.removeItem(key);
-    }
-    if (window.indexedDB && !sessionStorage.getItem('ld_vault_reset_done')) {
-      window.indexedDB.deleteDatabase('LawyersDiaryVault');
-      sessionStorage.setItem('ld_vault_reset_done', 'true');
-    }
-  } catch {}
-}
-
 const defaultFreshVaultFolders: VaultFolder[] = [
   { id: 'vf_root', name: 'LawyersDiary', path: '/LawyersDiary', parentPath: '', isSystem: true },
   { id: 'vf_clients', name: 'Clients', path: '/LawyersDiary/Clients', parentPath: '/LawyersDiary', isSystem: true },
@@ -272,6 +253,31 @@ const loadTenantStorage = <T,>(scope: string, key: string, fallback: T): T => {
   try {
     const raw = localStorage.getItem(`ld_scope_${scope}_${key}`);
     if (raw) return JSON.parse(raw);
+
+    // Fallback migration: Check if data was saved under another scope (e.g. email or usr) and migrate it
+    if (typeof window !== 'undefined') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const lKey = localStorage.key(i);
+        if (lKey && lKey.startsWith('ld_scope_') && lKey.endsWith(`_${key}`)) {
+          const fallbackRaw = localStorage.getItem(lKey);
+          if (fallbackRaw && fallbackRaw !== '[]' && fallbackRaw !== '{}') {
+            const parsed = JSON.parse(fallbackRaw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              localStorage.setItem(`ld_scope_${scope}_${key}`, fallbackRaw);
+              return parsed as T;
+            }
+          }
+        }
+      }
+      const legacyRaw = localStorage.getItem(`ld_react_${key}`);
+      if (legacyRaw && legacyRaw !== '[]' && legacyRaw !== '{}') {
+        const parsed = JSON.parse(legacyRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          localStorage.setItem(`ld_scope_${scope}_${key}`, legacyRaw);
+          return parsed as T;
+        }
+      }
+    }
   } catch (e) {
     console.error(`Failed to load ${key} for scope ${scope}`, e);
   }
@@ -656,6 +662,185 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     if (isLoggedIn) {
       fetchBackendDocuments();
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [isLoggedIn]);
+
+  // Synchronize real practice data (clients, matters, dockets) from backend into state
+  useEffect(() => {
+    let mounted = true;
+    const fetchBackendPracticeData = async () => {
+      try {
+        const [clientsRes, mattersRes, docketsRes] = await Promise.all([
+          fetch('/api/v1/clients?limit=500', { credentials: 'include' }),
+          fetch('/api/v1/matters?limit=500', { credentials: 'include' }),
+          fetch('/api/v1/dockets?limit=500', { credentials: 'include' }),
+        ]);
+
+        if (clientsRes.ok) {
+          const cJson = await clientsRes.json();
+          if (mounted && Array.isArray(cJson?.data)) {
+            const backendClients: Client[] = cJson.data.map((c: any) => ({
+              id: c._id,
+              name: c.name,
+              type: c.type || 'Company',
+              country: c.country || 'India',
+              contact: c.contact || '',
+              email: c.email || '',
+              phone: c.phone || '',
+              attorney: c.attorney || 'Self',
+              created: c.createdAt ? c.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+            }));
+            setClients((prev) => {
+              const bIds = new Set(backendClients.map((c) => c.id));
+              const localUnsynced = prev.filter((c) => !bIds.has(c.id));
+              localUnsynced.forEach((lc) => {
+                if (lc.id.startsWith('c_')) {
+                  fetch('/api/v1/clients', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                      name: lc.name,
+                      type: lc.type,
+                      country: lc.country,
+                      contact: lc.contact,
+                      email: lc.email,
+                      phone: lc.phone,
+                      attorney: lc.attorney,
+                    }),
+                  }).catch(() => {});
+                }
+              });
+              return [...backendClients, ...localUnsynced];
+            });
+          }
+        }
+
+        if (mattersRes.ok) {
+          const mJson = await mattersRes.json();
+          if (mounted && Array.isArray(mJson?.data)) {
+            const iprTypes = new Set(['TM', 'PAT', 'COPY', 'DESIGN', 'GI']);
+            const backendIpr: IprMatter[] = [];
+            const backendCourt: CourtMatter[] = [];
+
+            mJson.data.forEach((m: any) => {
+              if (iprTypes.has(m.type)) {
+                backendIpr.push({
+                  id: m._id,
+                  type: m.type as IprType,
+                  clientId: m.clientId || '',
+                  clientName: m.clientName || 'General Client',
+                  appNo: m.appNo || '',
+                  mark: m.mark || m.caseTitle || 'Mark',
+                  typeOfMark: m.typeOfMark,
+                  classes: m.classes,
+                  inventors: m.inventors,
+                  nature: m.nature,
+                  designClass: m.designClass,
+                  goods: m.goods,
+                  area: m.area,
+                  filingDate: m.filingDate ? m.filingDate.split('T')[0] : '',
+                  status: m.status || 'Pending',
+                  nextDate: m.nextDate ? m.nextDate.split('T')[0] : undefined,
+                  priority: m.priority || 'm',
+                  attorney: m.attorney || 'Self',
+                  notes: m.notes || '',
+                  created: m.createdAt ? m.createdAt.split('T')[0] : '',
+                  statusHistory: m.statusHistory || [],
+                });
+              } else {
+                backendCourt.push({
+                  id: m._id,
+                  type: m.type as CourtType,
+                  clientId: m.clientId || '',
+                  clientName: m.clientName || 'General Client',
+                  caseNo: m.caseNo || '',
+                  caseTitle: m.caseTitle || m.mark || 'Case',
+                  court: m.court || '',
+                  courtNo: m.courtNo,
+                  judgeName: m.judgeName,
+                  vcLink: m.vcLink,
+                  bench: m.bench,
+                  nature: m.nature,
+                  filingDate: m.filingDate ? m.filingDate.split('T')[0] : '',
+                  nextDate: m.nextDate ? m.nextDate.split('T')[0] : undefined,
+                  stage: m.stage || m.status || 'Filed',
+                  attorney: m.attorney || 'Self',
+                  priority: m.priority || 'm',
+                  notes: m.notes || '',
+                  created: m.createdAt ? m.createdAt.split('T')[0] : '',
+                  statusHistory: m.statusHistory || [],
+                });
+              }
+            });
+
+            setIprMatters((prev) => {
+              const bIds = new Set(backendIpr.map((m) => m.id));
+              const localUnsynced = prev.filter((m) => !bIds.has(m.id));
+              localUnsynced.forEach((lm) => {
+                if (lm.id.startsWith('m_')) {
+                  fetch('/api/v1/matters', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(lm),
+                  }).catch(() => {});
+                }
+              });
+              return [...backendIpr, ...localUnsynced];
+            });
+
+            setCourtMatters((prev) => {
+              const bIds = new Set(backendCourt.map((m) => m.id));
+              const localUnsynced = prev.filter((m) => !bIds.has(m.id));
+              localUnsynced.forEach((lm) => {
+                if (lm.id.startsWith('r_')) {
+                  fetch('/api/v1/matters', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(lm),
+                  }).catch(() => {});
+                }
+              });
+              return [...backendCourt, ...localUnsynced];
+            });
+          }
+        }
+
+        if (docketsRes.ok) {
+          const dJson = await docketsRes.json();
+          if (mounted && Array.isArray(dJson?.data)) {
+            const backendDockets: DocketEvent[] = dJson.data.map((d: any) => ({
+              id: d._id,
+              matterId: d.matterId || '',
+              matterName: d.matterName || 'Matter',
+              type: d.type || 'Hearing',
+              date: d.date ? d.date.split('T')[0] : '',
+              time: d.time || '10:30',
+              venue: d.venue || '',
+              priority: (d.priority as DocketPriority) || 'wa',
+              attorney: d.attorney || 'Self',
+              notes: d.notes || '',
+            }));
+
+            setDeadlines((prev) => {
+              const bIds = new Set(backendDockets.map((d) => d.id));
+              const localUnsynced = prev.filter((d) => !bIds.has(d.id));
+              return [...backendDockets, ...localUnsynced];
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Backend practice sync error:', err);
+      }
+    };
+
+    if (isLoggedIn) {
+      fetchBackendPracticeData();
     }
     return () => {
       mounted = false;
@@ -1080,7 +1265,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Client actions
   const addClient = useCallback(
-    (clientData: Omit<Client, 'id' | 'created'>) => {
+    (clientData: Omit<Client, 'id' | 'created'>, shouldClose = true): Client => {
       const newClient: Client = {
         ...clientData,
         id: gid('c'),
@@ -1097,10 +1282,41 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
         ...prev,
       ]);
       audit('CREATE', 'Client', newClient.name);
-      closeModal();
+      if (shouldClose) {
+        closeModal();
+      }
       showToast(`Client "${newClient.name}" created with Drive folders!`, 'ok');
+
+      if (isLoggedIn) {
+        fetch('/api/v1/clients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            name: newClient.name,
+            type: newClient.type || 'Company',
+            country: newClient.country || 'India',
+            contact: newClient.contact,
+            email: newClient.email,
+            phone: newClient.phone,
+            attorney: newClient.attorney,
+          }),
+        })
+          .then((r) => r.json())
+          .then((res) => {
+            if (res?.data?._id) {
+              const realId = res.data._id;
+              setClients((prev) =>
+                prev.map((c) => (c.id === newClient.id ? { ...c, id: realId } : c))
+              );
+            }
+          })
+          .catch(() => {});
+      }
+
+      return newClient;
     },
-    [audit, closeModal, showToast]
+    [audit, closeModal, showToast, isLoggedIn]
   );
 
   const deleteClient = useCallback(
@@ -1108,10 +1324,33 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (!canDeleteRecords) return;
       const client = clients.find((c) => c.id === id);
       setClients((prev) => prev.filter((c) => c.id !== id));
+      if (id && !id.startsWith('c_')) {
+        fetch(`/api/v1/clients/${id}`, { method: 'DELETE', credentials: 'include' }).catch(() => {});
+      }
       audit('DELETE', 'Client', client?.name || id);
       showToast('Client deleted', 'in');
     },
     [audit, canDeleteRecords, clients, showToast]
+  );
+
+  const updateClient = useCallback(
+    (id: string, updates: Partial<Client>) => {
+      setClients((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
+      );
+      if (id && !id.startsWith('c_')) {
+        fetch(`/api/v1/clients/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(updates),
+        }).catch(() => {});
+      }
+      audit('UPDATE', 'Client', `Client updated (${id})`);
+      closeModal();
+      showToast('Client details updated successfully', 'ok');
+    },
+    [audit, closeModal, showToast]
   );
 
   // Vault Folders & Documents
@@ -1475,9 +1714,49 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
           : `${newMatter.type} matter saved! Drive vault folder provisioned.`,
         'ok'
       );
+
+      if (isLoggedIn) {
+        fetch('/api/v1/matters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            type: newMatter.type,
+            clientId: newMatter.clientId,
+            clientName: newMatter.clientName,
+            appNo: newMatter.appNo,
+            mark: newMatter.mark,
+            typeOfMark: newMatter.typeOfMark,
+            classes: newMatter.classes,
+            inventors: newMatter.inventors,
+            nature: newMatter.nature,
+            designClass: newMatter.designClass,
+            goods: newMatter.goods,
+            area: newMatter.area,
+            filingDate: newMatter.filingDate,
+            nextDate: newMatter.nextDate,
+            status: newMatter.status,
+            priority: newMatter.priority,
+            attorney: newMatter.attorney,
+            notes: newMatter.notes,
+            statusHistory: newMatter.statusHistory,
+          }),
+        })
+          .then((r) => r.json())
+          .then((res) => {
+            if (res?.data?._id) {
+              const realId = res.data._id;
+              setIprMatters((prev) =>
+                prev.map((m) => (m.id === newMatter.id ? { ...m, id: realId } : m))
+              );
+            }
+          })
+          .catch(() => {});
+      }
+
       return newMatter;
     },
-    [audit, closeModal, ensureMatterFolders, showToast, uploadDocuments]
+    [audit, closeModal, ensureMatterFolders, showToast, uploadDocuments, isLoggedIn]
   );
 
   const updateIprMatter = useCallback(
@@ -1485,6 +1764,14 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setIprMatters((prev) =>
         prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
       );
+      if (id && !id.startsWith('m_')) {
+        fetch(`/api/v1/matters/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(updates),
+        }).catch(() => {});
+      }
       audit('UPDATE', 'Matter', `Matter updated (${id})`);
       showToast('Matter details updated successfully', 'ok');
     },
@@ -1497,6 +1784,9 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const m = iprMatters.find((x) => x.id === id);
       setIprMatters((prev) => prev.filter((x) => x.id !== id));
       setDeadlines((prev) => prev.filter((d) => d.matterId !== id));
+      if (id && !id.startsWith('m_')) {
+        fetch(`/api/v1/matters/${id}`, { method: 'DELETE', credentials: 'include' }).catch(() => {});
+      }
       audit('DELETE', 'Matter', m?.mark || id);
       showToast('Matter deleted', 'in');
     },
@@ -1505,7 +1795,7 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Court Matter actions
   const addCourtMatter = useCallback(
-    (matterData: Omit<CourtMatter, 'id' | 'created' | 'statusHistory'>) => {
+    (matterData: Omit<CourtMatter, 'id' | 'created' | 'statusHistory'>): CourtMatter => {
       const filingDate = matterData.filingDate || new Date().toISOString().split('T')[0];
       const newMatter: CourtMatter = {
         ...matterData,
@@ -1560,8 +1850,48 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       audit('CREATE', 'Court', `${newMatter.type}: ${newMatter.caseTitle}`);
       closeModal();
       showToast(`${newMatter.type} matter saved! Drive folder created.`, 'ok');
+
+      if (isLoggedIn) {
+        fetch('/api/v1/matters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            type: newMatter.type,
+            clientId: newMatter.clientId,
+            clientName: newMatter.clientName,
+            caseNo: newMatter.caseNo,
+            caseTitle: newMatter.caseTitle,
+            court: newMatter.court,
+            courtNo: newMatter.courtNo,
+            judgeName: newMatter.judgeName,
+            vcLink: newMatter.vcLink,
+            bench: newMatter.bench,
+            nature: newMatter.nature,
+            filingDate: newMatter.filingDate,
+            nextDate: newMatter.nextDate,
+            stage: newMatter.stage,
+            attorney: newMatter.attorney,
+            priority: newMatter.priority,
+            notes: newMatter.notes,
+            statusHistory: newMatter.statusHistory,
+          }),
+        })
+          .then((r) => r.json())
+          .then((res) => {
+            if (res?.data?._id) {
+              const realId = res.data._id;
+              setCourtMatters((prev) =>
+                prev.map((m) => (m.id === newMatter.id ? { ...m, id: realId } : m))
+              );
+            }
+          })
+          .catch(() => {});
+      }
+
+      return newMatter;
     },
-    [audit, closeModal, showToast]
+    [audit, closeModal, showToast, isLoggedIn]
   );
 
   const deleteCourtMatter = useCallback(
@@ -1570,15 +1900,38 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const r = courtMatters.find((x) => x.id === id);
       setCourtMatters((prev) => prev.filter((x) => x.id !== id));
       setDeadlines((prev) => prev.filter((d) => d.matterId !== id));
+      if (id && !id.startsWith('r_')) {
+        fetch(`/api/v1/matters/${id}`, { method: 'DELETE', credentials: 'include' }).catch(() => {});
+      }
       audit('DELETE', 'Court', r?.caseTitle || id);
       showToast('Court matter deleted', 'in');
     },
     [audit, canDeleteRecords, courtMatters, showToast]
   );
 
+  const updateCourtMatter = useCallback(
+    (id: string, updates: Partial<CourtMatter>) => {
+      setCourtMatters((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
+      );
+      if (id && !id.startsWith('r_')) {
+        fetch(`/api/v1/matters/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(updates),
+        }).catch(() => {});
+      }
+      audit('UPDATE', 'Court', `Court matter updated (${id})`);
+      closeModal();
+      showToast('Court matter updated successfully', 'ok');
+    },
+    [audit, closeModal, showToast]
+  );
+
   // Docket actions
   const addDocketEvent = useCallback(
-    (eventData: Omit<DocketEvent, 'id'>) => {
+    (eventData: Omit<DocketEvent, 'id'>): DocketEvent => {
       const newEvent: DocketEvent = {
         ...eventData,
         id: gid('d'),
@@ -1596,18 +1949,72 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       audit('CREATE', 'Deadline', `${newEvent.type} on ${newEvent.date}`);
       closeModal();
       showToast('Event added to Docket & Calendar!', 'ok');
+
+      if (isLoggedIn) {
+        fetch('/api/v1/dockets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            type: newEvent.type,
+            matterId: newEvent.matterId,
+            matterName: newEvent.matterName,
+            date: newEvent.date,
+            time: newEvent.time,
+            venue: newEvent.venue,
+            priority: newEvent.priority,
+            attorney: newEvent.attorney,
+            notes: newEvent.notes,
+          }),
+        })
+          .then((r) => r.json())
+          .then((res) => {
+            if (res?.data?._id) {
+              const realId = res.data._id;
+              setDeadlines((prev) =>
+                prev.map((d) => (d.id === newEvent.id ? { ...d, id: realId } : d))
+              );
+            }
+          })
+          .catch(() => {});
+      }
+
+      return newEvent;
     },
-    [audit, closeModal, showToast]
+    [audit, closeModal, showToast, isLoggedIn]
   );
 
   const deleteDocketEvent = useCallback(
     (id: string) => {
       if (!canDeleteRecords) return;
       setDeadlines((prev) => prev.filter((d) => d.id !== id));
+      if (id && !id.startsWith('d_')) {
+        fetch(`/api/v1/dockets/${id}`, { method: 'DELETE', credentials: 'include' }).catch(() => {});
+      }
       audit('DELETE', 'Deadline', `Event ${id}`);
       showToast('Docket event removed', 'in');
     },
     [audit, canDeleteRecords, showToast]
+  );
+
+  const updateDocketEvent = useCallback(
+    (id: string, updates: Partial<DocketEvent>) => {
+      setDeadlines((prev) =>
+        prev.map((d) => (d.id === id ? { ...d, ...updates } : d))
+      );
+      if (id && !id.startsWith('d_')) {
+        fetch(`/api/v1/dockets/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(updates),
+        }).catch(() => {});
+      }
+      audit('UPDATE', 'Deadline', `Event updated (${id})`);
+      closeModal();
+      showToast('Docket event updated successfully', 'ok');
+    },
+    [audit, closeModal, showToast]
   );
 
   // Work Log
@@ -1883,13 +2290,16 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       openModal,
       closeModal,
       addClient,
+      updateClient,
       deleteClient,
       addIprMatter,
       updateIprMatter,
       deleteIprMatter,
       addCourtMatter,
+      updateCourtMatter,
       deleteCourtMatter,
       addDocketEvent,
+      updateDocketEvent,
       deleteDocketEvent,
       vaultFolders,
       createVaultFolder,
@@ -1964,13 +2374,16 @@ export const LawyersDiaryProvider: React.FC<{ children: React.ReactNode }> = ({ 
       openModal,
       closeModal,
       addClient,
+      updateClient,
       deleteClient,
       addIprMatter,
       updateIprMatter,
       deleteIprMatter,
       addCourtMatter,
+      updateCourtMatter,
       deleteCourtMatter,
       addDocketEvent,
+      updateDocketEvent,
       deleteDocketEvent,
       createVaultFolder,
       ensureMatterFolders,

@@ -15,6 +15,7 @@ import {
   Hammer,
   Plus,
   Eye,
+  Pencil,
   Trash2,
   Filter,
 } from 'lucide-react';
@@ -335,6 +336,17 @@ export const CourtMatterPage: React.FC<CourtMatterPageProps> = ({ type }) => {
                 {/* Actions */}
                 <td style={{ textAlign: 'right' }}>
                   <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+                    <button
+                      className="btn btn-o btn-s"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openModal('edit-court', r);
+                      }}
+                      title="Edit Case Record"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
                     <button
                       className="btn btn-o btn-s"
                       onClick={(e) => {

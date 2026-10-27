@@ -3,7 +3,7 @@ const { organizationRef, userRef } = require('./common');
 
 const docketEventSchema = new mongoose.Schema({
   organizationId: organizationRef,
-  matterId: { type: mongoose.Schema.Types.ObjectId, ref: 'Matter', required: true, index: true },
+  matterId: { type: mongoose.Schema.Types.ObjectId, ref: 'Matter', index: true },
   type: String,
   matterName: String,
   date: { type: Date, required: true, index: true },

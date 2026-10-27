@@ -13,6 +13,7 @@ import {
   FolderOpen,
   Trash2,
   Plus,
+  Pencil,
   FileText,
   Building,
   User,
@@ -26,6 +27,7 @@ import {
   ChevronDown,
   Folder,
   Award,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 export const MatterDetailModal: React.FC = () => {
@@ -108,26 +110,9 @@ export const MatterDetailModal: React.FC = () => {
   const [isLocalUploadOpen, setIsLocalUploadOpen] = useState(false);
   const [targetParentFolder, setTargetParentFolder] = useState<string>(matterRootPath);
   const [targetUploadFolder, setTargetUploadFolder] = useState<string>(matterRootPath);
-  const [isVaultMenuOpen, setIsVaultMenuOpen] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
-  const vaultMenuRef = useRef<HTMLDivElement>(null);
   const directFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Click outside to close document vault menu
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (vaultMenuRef.current && !vaultMenuRef.current.contains(e.target as Node)) {
-        setIsVaultMenuOpen(false);
-      }
-    };
-    if (isVaultMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isVaultMenuOpen]);
 
   // Filtered documents by selected folder
   const filteredDocs = useMemo(() => {
@@ -213,9 +198,27 @@ export const MatterDetailModal: React.FC = () => {
               Client: <strong>{matter.clientName}</strong> · Filed: {matter.filingDate || '—'}
             </div>
           </div>
-          <button className="mc" onClick={closeModal} title="Close">
-            <X className="w-4 h-4" />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <button
+              type="button"
+              className="btn btn-o btn-s"
+              onClick={() => {
+                closeModal();
+                if (isIpr) {
+                  openModal('edit-ipr', matter);
+                } else {
+                  openModal('edit-court', matter);
+                }
+              }}
+              title="Edit Matter"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>Edit</span>
+            </button>
+            <button className="mc" onClick={closeModal} title="Close">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -330,8 +333,8 @@ export const MatterDetailModal: React.FC = () => {
                           textDecoration: 'underline',
                         }}
                       >
-                        <UploadCloud size={13} />
-                        {(matter as IprMatter).markImage ? 'Change Mark Representation' : 'Upload Mark Representation'}
+                        <ImageIcon size={13} />
+                        {(matter as IprMatter).markImage ? 'Change Mark Logo' : 'Attach Mark Logo / Artwork'}
                         <input
                           type="file"
                           accept=".png,.jpg,.jpeg,.svg,.webp,.pdf"
@@ -585,139 +588,6 @@ export const MatterDetailModal: React.FC = () => {
                   <span>Add Hearing</span>
                 </button>
 
-                {/* Document Vault Dropdown Menu */}
-                <div style={{ position: 'relative' }} ref={vaultMenuRef}>
-                  <button
-                    type="button"
-                    className="btn btn-o btn-s"
-                    onClick={() => setIsVaultMenuOpen(!isVaultMenuOpen)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                    title="Document Vault Actions"
-                  >
-                    <FolderOpen className="w-3.5 h-3.5 text-sky-600" />
-                    <span>Document Vault</span>
-                    <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isVaultMenuOpen ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {isVaultMenuOpen && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: 'calc(100% + 8px)',
-                        left: 0,
-                        zIndex: 1020,
-                        minWidth: '280px',
-                        backgroundColor: '#ffffff',
-                        borderRadius: '10px',
-                        boxShadow: '0 12px 30px -4px rgba(15, 23, 42, 0.25), 0 4px 6px -2px rgba(15, 23, 42, 0.05)',
-                        border: '1px solid #e2e8f0',
-                        padding: '6px',
-                        animation: 'fadeIn 0.15s ease',
-                      }}
-                    >
-                      <div style={{ padding: '8px 10px', borderBottom: '1px solid #f1f5f9' }}>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>
-                          Document Vault Actions
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          📁 {folderName}
-                        </div>
-                      </div>
-
-                      <div style={{ padding: '4px 0' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsVaultMenuOpen(false);
-                            handleOpenUpload();
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            width: '100%',
-                            padding: '8px 10px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            background: 'none',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                          }}
-                          className="hover:bg-slate-50 transition-colors"
-                        >
-                          <div style={{ width: 30, height: 30, borderRadius: 6, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
-                            <UploadCloud size={16} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#1e293b' }}>Upload File</div>
-                            <div style={{ fontSize: '0.71rem', color: '#64748b' }}>Upload PDF, evidence, briefs to matter</div>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsVaultMenuOpen(false);
-                            handleOpenCreateFolder();
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            width: '100%',
-                            padding: '8px 10px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            background: 'none',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                          }}
-                          className="hover:bg-slate-50 transition-colors"
-                        >
-                          <div style={{ width: 30, height: 30, borderRadius: 6, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
-                            <FolderPlus size={16} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#1e293b' }}>Create Folder</div>
-                            <div style={{ fontSize: '0.71rem', color: '#64748b' }}>Add new subfolder to this matter vault</div>
-                          </div>
-                        </button>
-
-                        <div style={{ height: 1, backgroundColor: '#f1f5f9', margin: '4px 0' }} />
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsVaultMenuOpen(false);
-                            handleOpenInFullVault();
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            width: '100%',
-                            padding: '8px 10px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            background: 'none',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                          }}
-                          className="hover:bg-slate-50 transition-colors"
-                        >
-                          <div style={{ width: 30, height: 30, borderRadius: 6, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>
-                            <ExternalLink size={16} />
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#1e293b' }}>Open in Full Vault</div>
-                            <div style={{ fontSize: '0.71rem', color: '#64748b' }}>Navigate to Document Vault Drive</div>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 <button
                   className="btn btn-g btn-s"
                   onClick={() => openModal('log-time', { matterId: matter.id, matterName: title })}
@@ -771,16 +641,6 @@ export const MatterDetailModal: React.FC = () => {
                   >
                     <FolderPlus size={12} className="text-sky-600" />
                     <span>+ Folder</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-p btn-s"
-                    style={{ fontSize: '0.7rem', padding: '0.18rem 0.45rem', display: 'flex', alignItems: 'center', gap: '3px', borderRadius: '4px' }}
-                    title="Upload Document"
-                    onClick={() => handleOpenUpload()}
-                  >
-                    <UploadCloud size={12} />
-                    <span>+ Upload</span>
                   </button>
                 </div>
               </div>
@@ -971,11 +831,12 @@ export const MatterDetailModal: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-p btn-s"
-                  style={{ fontSize: '0.7rem', padding: '0.18rem 0.45rem', display: 'flex', alignItems: 'center', gap: '3px', borderRadius: '4px' }}
+                  style={{ fontSize: '0.72rem', padding: '0.22rem 0.6rem', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '5px' }}
                   onClick={() => handleOpenUpload()}
+                  title="Upload legal documents, petitions, orders or evidence"
                 >
-                  <UploadCloud size={12} />
-                  <span>Upload File</span>
+                  <UploadCloud size={13} />
+                  <span>+ Upload File</span>
                 </button>
               </div>
 
@@ -1084,44 +945,21 @@ export const MatterDetailModal: React.FC = () => {
                       border: isDraggingFile ? '2px dashed var(--pr)' : '1px dashed var(--bd)',
                       background: isDraggingFile ? 'rgba(30, 58, 138, 0.05)' : '#f8fafc',
                       borderRadius: '8px',
-                      padding: '1.25rem 1rem',
+                      padding: '1.5rem 1rem',
                       textAlign: 'center',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
                       marginBottom: '0.5rem',
                     }}
+                    className="hover:bg-slate-100 transition-colors"
                   >
-                    <UploadCloud className="w-7 h-7 text-indigo-500 mx-auto mb-1.5" />
-                    <p style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--tx)', margin: '0 0 2px' }}>
-                      No documents uploaded {selectedVaultFolder ? 'to this folder' : 'yet'}
+                    <UploadCloud className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
+                    <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--tx)', margin: '0 0 3px' }}>
+                      No documents {selectedVaultFolder ? `in ${selectedVaultFolder.split('/').pop()}` : 'uploaded yet'}
                     </p>
-                    <p style={{ fontSize: '0.72rem', color: 'var(--tx2)', margin: '0 0 10px' }}>
-                      Drag &amp; drop legal files here, or <span style={{ color: 'var(--pr)', textDecoration: 'underline' }}>browse</span>
+                    <p style={{ fontSize: '0.74rem', color: 'var(--tx2)', margin: 0 }}>
+                      Drag &amp; drop files here, or <span style={{ color: 'var(--pr)', fontWeight: 600, textDecoration: 'underline' }}>click to browse</span>
                     </p>
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
-                      <button
-                        type="button"
-                        className="btn btn-p btn-s"
-                        style={{ fontSize: '0.72rem', padding: '0.22rem 0.6rem' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenUpload();
-                        }}
-                      >
-                        <UploadCloud size={12} /> Upload File
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-g btn-s"
-                        style={{ fontSize: '0.72rem', padding: '0.22rem 0.6rem' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenCreateFolder();
-                        }}
-                      >
-                        <FolderPlus size={12} /> New Folder
-                      </button>
-                    </div>
                   </div>
                 )}
 
@@ -1139,12 +977,30 @@ export const MatterDetailModal: React.FC = () => {
 
         {/* Footer */}
         <div className="mf" id="det-f">
-          {canDeleteRecords && (
-            <button className="btn btn-d btn-s" onClick={handleDelete}>
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete Matter</span>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-p btn-s"
+              onClick={() => {
+                closeModal();
+                if (isIpr) {
+                  openModal('edit-ipr', matter);
+                } else {
+                  openModal('edit-court', matter);
+                }
+              }}
+              title="Edit Matter Details"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>Edit Matter</span>
             </button>
-          )}
+            {canDeleteRecords && (
+              <button className="btn btn-d btn-s" onClick={handleDelete}>
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Matter</span>
+              </button>
+            )}
+          </div>
           <button className="btn btn-o" onClick={closeModal}>
             Close
           </button>
